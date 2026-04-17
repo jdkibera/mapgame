@@ -611,6 +611,100 @@
   }
   .name-field input:focus { border-color: var(--copper); box-shadow: 0 0 0 3px rgba(194,123,92,0.14); }
 
+  /* Solo/Multi mode tabs on the welcome card */
+  .mode-toggle {
+    display: inline-flex;
+    margin: 4px 0 16px 0;
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--cream);
+  }
+  .mode-tab {
+    background: transparent;
+    border: none;
+    color: var(--text-med);
+    font-family: var(--font-body);
+    font-size: 0.88rem;
+    padding: 8px 18px;
+    cursor: pointer;
+    letter-spacing: 0.05em;
+    transition: background 0.15s, color 0.15s;
+  }
+  .mode-tab.active {
+    background: var(--navy);
+    color: var(--cream);
+  }
+  .mode-pane[hidden] { display: none !important; }
+  [hidden] { display: none !important; }
+  .multi-pane { margin-bottom: 16px; }
+  .player-inputs {
+    display: flex; flex-direction: column; gap: 8px;
+    margin-bottom: 10px;
+  }
+  .player-inputs input {
+    padding: 8px 12px;
+    font-size: 0.95rem;
+    font-family: var(--font-heading);
+    border: 1px solid var(--card-border);
+    background: var(--cream);
+    border-radius: 6px;
+    outline: none;
+    color: var(--navy);
+    text-align: center;
+    font-style: italic;
+  }
+  .player-inputs input:focus { border-color: var(--copper); box-shadow: 0 0 0 3px rgba(194,123,92,0.14); }
+  .add-player-btn {
+    background: transparent;
+    border: 1px dashed var(--card-border);
+    color: var(--copper);
+    font-family: var(--font-body); font-size: 0.85rem;
+    padding: 6px 14px; border-radius: 6px;
+    cursor: pointer;
+  }
+  .add-player-btn:hover { border-color: var(--copper); background: var(--copper-pale); }
+  .add-player-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* Multiplayer score strip (replaces the 4-stat card in multi mode) */
+  .hud-players {
+    top: 18px; right: 18px;
+    padding: 8px 12px;
+    display: flex; gap: 10px; align-items: center;
+    font-family: var(--font-heading);
+    max-width: 60vw; flex-wrap: wrap;
+  }
+  .hud-players .pstat {
+    display: flex; flex-direction: column; align-items: center;
+    padding: 4px 10px; border-radius: 8px;
+    min-width: 60px;
+    transition: background 0.2s;
+  }
+  .hud-players .pstat.active {
+    background: var(--copper-pale);
+    box-shadow: 0 0 0 1px var(--copper-light) inset;
+  }
+  .hud-players .pname {
+    font-size: 0.7rem; color: var(--text-med);
+    font-family: var(--font-body); font-style: italic;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .hud-players .pstat.active .pname { color: var(--copper-dark); font-weight: 600; }
+  .hud-players .pscore { font-size: 1.15rem; color: var(--navy); font-weight: 500; font-variant-numeric: tabular-nums; }
+
+  /* Turn banner above the prompt question (multi only) */
+  .turn-banner {
+    display: none;
+    font-family: var(--font-display);
+    color: var(--copper);
+    font-size: 0.85rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  body.multi-mode .turn-banner { display: block; }
+
   .secondary-link {
     display: inline-block; margin-top: 14px;
     color: var(--copper); font-style: italic;
@@ -1049,7 +1143,7 @@
   </div>
 </header>
 
-<section class="hud hud-score" aria-label="Score">
+<section class="hud hud-score" id="hudScore" aria-label="Score">
   <div class="stat"><span class="label">Score</span><span class="value" id="score">0</span></div>
   <div class="sep"></div>
   <div class="stat"><span class="label">Streak</span><span class="value" id="streak">0</span></div>
@@ -1058,6 +1152,8 @@
   <div class="sep"></div>
   <div class="stat"><span class="label">Best</span><span class="value" id="best">0</span></div>
 </section>
+
+<section class="hud hud-players" id="hudPlayers" aria-label="Players" hidden></section>
 
 <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Toggle menu">⋯</button>
 
@@ -1119,6 +1215,7 @@
 <section class="hud hud-prompt">
   <img id="promptFlag" class="prompt-flag" alt="Flag" style="display:none" />
   <div class="prompt-row">
+    <div class="turn-banner" id="turnBanner"></div>
     <div class="prompt-eyebrow" id="promptEyebrow">Name this country</div>
     <div class="prompt-question" id="promptQuestion">Loading…</div>
     <div class="prompt-sub" id="promptSub"></div>
@@ -1161,10 +1258,26 @@
     <div class="flourish">— A Cartographer's Quiz —</div>
     <h2 id="welcomeGreeting">Welcome, Tallulah</h2>
     <p>A country will be highlighted on the map. Name it — and for a bonus, name its capital. Three tries before it's revealed.</p>
-    <div class="name-field">
+
+    <div class="mode-toggle" role="tablist">
+      <button type="button" class="mode-tab active" data-mode="solo">Solo</button>
+      <button type="button" class="mode-tab" data-mode="multi">Multiplayer</button>
+    </div>
+
+    <div class="name-field mode-pane" data-pane="solo">
       <label for="nameInput">Your name, Explorer —</label>
       <input type="text" id="nameInput" placeholder="Tallulah" maxlength="24" autocomplete="off" spellcheck="false" />
     </div>
+
+    <div class="mode-pane multi-pane" data-pane="multi" hidden>
+      <label style="display:block; font-family: var(--font-heading); font-style: italic; color: var(--text-med); margin-bottom: 8px;">Explorers — up to 5, in turn order</label>
+      <div class="player-inputs" id="playerInputs">
+        <input type="text" class="player-name" placeholder="Player 1" maxlength="20" autocomplete="off" spellcheck="false" />
+        <input type="text" class="player-name" placeholder="Player 2" maxlength="20" autocomplete="off" spellcheck="false" />
+      </div>
+      <button type="button" class="add-player-btn" id="addPlayerBtn">+ Add player</button>
+    </div>
+
     <p style="font-size:0.85rem;">Progress through twelve levels, from <em>Home Waters</em> to <em>Here Be Dragons</em>. Use <span class="kbd">Space</span> to advance, <span class="kbd">Enter</span> to submit, and the <strong>🎤</strong> to switch to voice mode (stays on).</p>
     <div style="display:flex; flex-direction:column; align-items:center; gap:10px;">
       <button class="primary" id="startBtn" style="padding:10px 24px; font-size:1rem;">Begin Voyage</button>
@@ -1187,6 +1300,7 @@
     <div class="roman" id="luRoman">— Level II —</div>
     <div class="title" id="luTitle">Foreign Shores</div>
     <div class="subtitle" id="luSubtitle">Beyond the Horizon</div>
+    <div class="subtitle" id="luWinner" style="margin-top: 8px; color: var(--copper); font-style: italic;"></div>
     <div class="ornament">✦ ✦ ✦</div>
   </div>
 </div>
@@ -1537,6 +1651,9 @@ function flagUrl(id, size = "w160") {
    STATE
    ========================================================================= */
 const STAGE = { IDLE: "idle", COUNTRY: "country", CAPITAL: "capital", RESOLVED: "resolved" };
+function makePlayer(name) {
+  return { name: name || "Explorer", score: 0, levelScore: 0, streak: 0, best: 0, correct: 0 };
+}
 let state = {
   topo: null,
   features: [],
@@ -1546,10 +1663,12 @@ let state = {
   currentId: null,
   stage: STAGE.IDLE,
   tries: 0,
-  score: 0,
-  streak: 0,
-  best: 0,
   level: 1,
+  // Multiplayer: players[0] is always valid. Solo = 1 player; multi = 2-5.
+  mode: "solo",
+  players: [makePlayer("Tallulah")],
+  currentPlayerIdx: 0,
+  turnJustAdvanced: false,
   voiceMode: true,
   listening: false,
   recognition: null,
@@ -1558,10 +1677,12 @@ let state = {
   autoAdvanceTimer: null,
   autoZoom: true,
 };
+// cur() returns the player whose turn it is. Always safe even if mis-indexed.
+function cur() { return state.players[state.currentPlayerIdx] || state.players[0]; }
 try { state.autoZoom = JSON.parse(localStorage.getItem("we_autoZoom") || "true"); } catch(e) {}
 try { state.flagMode = JSON.parse(localStorage.getItem("we_flagMode") || "false"); } catch(e) {}
 try { state.voiceMode = JSON.parse(localStorage.getItem("we_voiceMode") || "true"); } catch(e) {}
-try { state.best = Number(localStorage.getItem("we_best") || 0) || 0; } catch(e) { state.best = 0; }
+try { state.players[0].best = Number(localStorage.getItem("we_best") || 0) || 0; } catch(e) { state.players[0].best = 0; }
 
 /* =========================================================================
    PLAYER NAME (personalizes the title)
@@ -2226,6 +2347,8 @@ function pickNext() {
     }
   }
   const id = remaining[Math.floor(Math.random() * remaining.length)];
+  // Rotate to the next player for each new country (multi mode only).
+  advancePlayer();
   state.currentId = id;
   state.stage = STAGE.COUNTRY;
   state.tries = 0;
@@ -2258,6 +2381,18 @@ function pickNext() {
   updateStats();
   updateSuggestions();
   setTimeout(() => $("answerInput").focus(), 40);
+  // Multi mode: announce whose turn it is before starting the mic, so the
+  // agent's voice isn't captured as the player's answer.
+  if (state.mode === "multi" && state.turnJustAdvanced) {
+    state.turnJustAdvanced = false;
+    state.suppressListening = true;
+    setTimeout(() => { state.suppressListening = false; }, 2200); // fallback
+    speakBritish(`${cur().name}, your turn.`, () => {
+      state.suppressListening = false;
+      maybeStartListeningForStage();
+    });
+    return;
+  }
   maybeStartListeningForStage();
 }
 
@@ -2280,11 +2415,16 @@ function submitAnswer() {
   if (state.stage === STAGE.COUNTRY) {
     if (matchesCountryAny(meta)) {
       const pts = pointsForTries(state.tries);
-      state.score += pts;
-      if (state.tries === 0) state.streak += 1; else state.streak = 0;
-      if (state.streak > state.best) {
-        state.best = state.streak;
-        try { localStorage.setItem("we_best", String(state.best)); } catch(e) {}
+      const p = cur();
+      p.score += pts;
+      p.levelScore += pts;
+      p.correct += 1;
+      if (state.tries === 0) p.streak += 1; else p.streak = 0;
+      if (p.streak > p.best) {
+        p.best = p.streak;
+        if (state.mode === "solo") {
+          try { localStorage.setItem("we_best", String(p.best)); } catch(e) {}
+        }
       }
       if (meta.ocean) {
         d3.select("#oceanLabel_" + state.currentId).classed("target", false).text(meta.name);
@@ -2309,7 +2449,7 @@ function submitAnswer() {
       state.tries += 1;
       updateTriesDots();
       flashWrongInput();
-      state.streak = 0;
+      cur().streak = 0;
       updateStats();
       if (state.tries >= 3) {
         revealCountry(meta);
@@ -2322,7 +2462,9 @@ function submitAnswer() {
   } else if (state.stage === STAGE.CAPITAL) {
     if (matchesCapitalAny(meta)) {
       const bonus = bonusForTries(state.tries);
-      state.score += bonus;
+      const p = cur();
+      p.score += bonus;
+      p.levelScore += bonus;
       showFeedback("correct", `✓ ${meta.capital}. Bonus +${bonus}`);
       fireConfetti();
       playCorrectSfx();
@@ -2360,7 +2502,7 @@ function beginCapitalStage(meta) {
 
 function revealCountry(meta) {
   state.stage = STAGE.RESOLVED;
-  state.streak = 0;
+  cur().streak = 0;
   if (meta.ocean) {
     d3.select("#oceanLabel_" + state.currentId).classed("target", false).text(meta.name);
     d3.select("#oceanPulse").classed("show", false);
@@ -2440,10 +2582,38 @@ function showFeedback(kind, text) {
 }
 
 function updateStats() {
-  $("score").textContent = state.score;
-  $("streak").textContent = state.streak;
-  $("seen").textContent = `${state.answered.size} / ${state.pool.length}`;
-  $("best").textContent = state.best;
+  const solo = state.mode === "solo";
+  // Solo: keep the classic 4-stat card. Multi: swap to a per-player strip.
+  $("hudScore").hidden = !solo;
+  $("hudPlayers").hidden = solo;
+  if (solo) {
+    const p = cur();
+    $("score").textContent = p.score;
+    $("streak").textContent = p.streak;
+    $("seen").textContent = `${state.answered.size} / ${state.pool.length}`;
+    $("best").textContent = p.best;
+  } else {
+    const hud = $("hudPlayers");
+    hud.innerHTML = "";
+    state.players.forEach((pl, i) => {
+      const cell = document.createElement("div");
+      cell.className = "pstat" + (i === state.currentPlayerIdx ? " active" : "");
+      cell.innerHTML = `<span class="pname"></span><span class="pscore">${pl.score}</span>`;
+      cell.querySelector(".pname").textContent = pl.name;
+      hud.appendChild(cell);
+    });
+  }
+  // Turn banner in the prompt card (visible only in multi via body.multi-mode)
+  const banner = $("turnBanner");
+  if (banner) banner.textContent = state.mode === "multi" ? `${cur().name} — your turn` : "";
+}
+
+// In multi mode, rotate to the next player before each new country.
+// In solo, this is a no-op. The capital stage stays with the same player.
+function advancePlayer() {
+  if (state.mode !== "multi" || state.players.length <= 1) return;
+  state.currentPlayerIdx = (state.currentPlayerIdx + 1) % state.players.length;
+  state.turnJustAdvanced = true;
 }
 
 /* Auto-advance after a question resolves (for iPad-friendly play) */
@@ -2638,6 +2808,24 @@ function showLevelUp() {
   $("luRoman").textContent = `— Level ${t.roman} —`;
   $("luTitle").textContent = t.name;
   $("luSubtitle").textContent = t.subtitle;
+  // Multi: announce the winner of the *previous* level, then reset levelScore.
+  const winnerEl = $("luWinner");
+  if (winnerEl) {
+    if (state.mode === "multi" && state.players.length > 1) {
+      const ranked = [...state.players].sort((a, b) => b.levelScore - a.levelScore);
+      const top = ranked[0];
+      const tied = ranked.filter(p => p.levelScore === top.levelScore && top.levelScore > 0);
+      let msg = "";
+      if (top.levelScore === 0) msg = "No points scored that level.";
+      else if (tied.length > 1) msg = `Tied at ${top.levelScore}: ${tied.map(p => p.name).join(", ")}`;
+      else msg = `${top.name} wins the level with ${top.levelScore} points`;
+      winnerEl.textContent = msg;
+      speakBritish(msg);
+    } else {
+      winnerEl.textContent = "";
+    }
+  }
+  state.players.forEach(p => { p.levelScore = 0; });
   const overlay = $("levelup");
   // Restart animations by re-adding classes
   overlay.classList.remove("show");
@@ -2660,9 +2848,28 @@ function showLevelUp() {
    ========================================================================= */
 function showVictory() {
   $("victory").classList.add("show");
-  $("victoryStats").innerHTML =
-    `You conquered all ${TIERS.length} levels with a final score of <strong>${state.score}</strong>. Best streak: <strong>${state.best}</strong>.`;
-  // Big finale confetti + victory fanfare
+  if (state.mode === "multi" && state.players.length > 1) {
+    const ranked = [...state.players].sort((a, b) => b.score - a.score);
+    const top = ranked[0];
+    const tied = ranked.filter(p => p.score === top.score);
+    const header = tied.length > 1
+      ? `A tie at <strong>${top.score}</strong> — ${tied.map(p => p.name).join(", ")}!`
+      : `<strong>${top.name}</strong> wins with <strong>${top.score}</strong> points!`;
+    const rows = ranked.map((p, i) =>
+      `<div style="display:flex; justify-content:space-between; padding:4px 0; ${i === 0 ? "color:var(--copper); font-weight:600;" : ""}">
+        <span>${i + 1}. ${p.name}</span>
+        <span>${p.score} pts · ${p.correct} correct</span>
+       </div>`
+    ).join("");
+    $("victoryStats").innerHTML =
+      `${header}<div style="margin-top:12px; text-align:left; max-width:320px; margin-left:auto; margin-right:auto;">${rows}</div>`;
+    if (tied.length === 1) speakBritish(`${top.name} wins with ${top.score} points.`);
+    else speakBritish(`A tie! ${tied.map(p => p.name).join(" and ")} both finish with ${top.score} points.`);
+  } else {
+    const p = cur();
+    $("victoryStats").innerHTML =
+      `You conquered all ${TIERS.length} levels with a final score of <strong>${p.score}</strong>. Best streak: <strong>${p.best}</strong>.`;
+  }
   playVictorySfx();
   for (let i = 0; i < 3; i++) setTimeout(fireConfetti, i * 220);
   stopAmbient();
@@ -2675,8 +2882,11 @@ function resetGame(toLevel) {
   cancelAutoAdvance();
   state.answered = new Set();
   state.countryHistory = new Map();
-  state.score = 0;
-  state.streak = 0;
+  state.players.forEach(p => {
+    p.score = 0; p.levelScore = 0; p.streak = 0; p.correct = 0;
+    // keep p.best (all-time personal best for solo)
+  });
+  state.currentPlayerIdx = state.players.length - 1; // advancePlayer() will roll to 0
   state.stage = STAGE.IDLE;
   state.tries = 0;
   state.currentId = null;
@@ -2952,7 +3162,8 @@ function wire() {
     }
   });
   $("resetBtn").addEventListener("click", () => {
-    if (state.score === 0 && state.answered.size === 0 && state.countryHistory.size === 0 && state.level === 1) {
+    const totalScore = state.players.reduce((s, p) => s + p.score, 0);
+    if (totalScore === 0 && state.answered.size === 0 && state.countryHistory.size === 0 && state.level === 1) {
       return;
     }
     resetGame(1);
@@ -2975,10 +3186,65 @@ function wire() {
       document.getElementById("welcomeGreeting").textContent = `Welcome, ${n}`;
     });
   }
+
+  // Mode tabs — swap between solo / multi panes on the welcome card.
+  let selectedMode = "solo";
+  document.querySelectorAll(".mode-tab").forEach(btn => {
+    btn.addEventListener("click", () => {
+      selectedMode = btn.dataset.mode;
+      document.querySelectorAll(".mode-tab").forEach(t => t.classList.toggle("active", t === btn));
+      document.querySelectorAll(".mode-pane").forEach(pane => {
+        pane.hidden = pane.dataset.pane !== selectedMode;
+      });
+    });
+  });
+
+  // Add-player button — up to 5 slots.
+  const addPlayerBtn = $("addPlayerBtn");
+  const playerInputs = $("playerInputs");
+  if (addPlayerBtn && playerInputs) {
+    addPlayerBtn.addEventListener("click", () => {
+      const count = playerInputs.querySelectorAll("input.player-name").length;
+      if (count >= 5) return;
+      const inp = document.createElement("input");
+      inp.type = "text";
+      inp.className = "player-name";
+      inp.placeholder = `Player ${count + 1}`;
+      inp.maxLength = 20;
+      inp.autocomplete = "off";
+      inp.spellcheck = false;
+      playerInputs.appendChild(inp);
+      if (count + 1 >= 5) addPlayerBtn.disabled = true;
+    });
+  }
+
   $("startBtn").addEventListener("click", () => {
-    const nm = $("nameInput") && $("nameInput").value.trim();
-    if (nm) setPlayerName(nm); else applyPlayerName();
-    const greet = nm || getPlayerName();
+    // Build the players list from whichever pane is active.
+    if (selectedMode === "multi") {
+      const names = [...document.querySelectorAll(".player-name")]
+        .map(i => i.value.trim())
+        .filter(Boolean);
+      if (names.length < 2) {
+        // Fall back to solo if fewer than 2 names provided.
+        state.mode = "solo";
+        state.players = [makePlayer(names[0] || $("nameInput").value.trim() || "Tallulah")];
+      } else {
+        state.mode = "multi";
+        state.players = names.slice(0, 5).map(makePlayer);
+      }
+    } else {
+      state.mode = "solo";
+      const nm = $("nameInput") && $("nameInput").value.trim();
+      if (nm) setPlayerName(nm); else applyPlayerName();
+      state.players = [makePlayer(nm || getPlayerName())];
+      try { state.players[0].best = Number(localStorage.getItem("we_best") || 0) || 0; } catch(e) {}
+    }
+    state.currentPlayerIdx = state.players.length - 1; // first advancePlayer rolls to 0
+    document.body.classList.toggle("multi-mode", state.mode === "multi");
+    applyPlayerName();
+    const greet = state.mode === "multi"
+      ? `Hello explorers — ${state.players.map(p => p.name).join(", ")}. Let's explore.`
+      : `Hello ${state.players[0].name}, let's explore.`;
 
     // === iOS / Chrome-mobile gesture window ===
     // Everything permission-sensitive must run synchronously inside this
@@ -3008,8 +3274,8 @@ function wire() {
         startListening();
       }
     };
-    setTimeout(releaseListening, 3000); // fallback
-    speakBritish(`Hello ${greet}, let's explore.`, releaseListening);
+    setTimeout(releaseListening, 3500); // fallback (a bit longer for multi-player greeting)
+    speakBritish(greet, releaseListening);
 
     // 2. Grab a persistent mic stream so subsequent SpeechRecognition
     //    sessions don't re-prompt. We don't consume it directly — we just
