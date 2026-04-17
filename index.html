@@ -838,13 +838,85 @@
   }
 
   @media (max-width: 760px) {
-    .hud-title { max-width: 220px; padding: 10px 14px; }
-    .hud-title h1 { font-size: 1.25rem; }
+    /* Compact top HUD so map gets vertical space */
+    .hud-title {
+      top: 8px; left: 8px; padding: 6px 10px; max-width: 170px;
+    }
+    .hud-title h1 { font-size: 1rem; letter-spacing: 0.01em; }
     .hud-title .subtitle { display: none; }
-    .hud-score { padding: 8px 12px; gap: 12px; }
-    .hud-score .value { font-size: 1.15rem; }
-    .hud-toolbar { top: 96px; padding: 6px; gap: 4px; flex-wrap: wrap; max-width: 220px; }
-    .prompt-question { font-size: 1.35rem; }
+    .hud-title .level-badge { margin-top: 4px; padding-top: 4px; }
+    .hud-title .level-badge .lvl-num { font-size: 0.65rem; }
+    .hud-title .level-badge .lvl-name { font-size: 0.85rem; }
+
+    .hud-score {
+      top: 8px; right: 8px; padding: 5px 8px; gap: 8px;
+    }
+    .hud-score .stat { min-width: 38px; }
+    .hud-score .label { font-size: 0.52rem; letter-spacing: 0.15em; }
+    .hud-score .value { font-size: 0.95rem; }
+    .hud-score .sep { display: none; }
+
+    .hud-toolbar {
+      top: 80px; right: 8px; padding: 5px; gap: 4px;
+      flex-wrap: wrap; max-width: 200px; justify-content: flex-end;
+    }
+    .tbtn { font-size: 0.72rem; padding: 5px 8px; }
+    .tbtn svg { width: 12px; height: 12px; }
+
+    /* Prompt card — semi-transparent, compact, at the bottom */
+    .hud-prompt {
+      bottom: 6px;
+      width: calc(100vw - 14px);
+      padding: 8px 12px 10px 12px;
+      background: rgba(247,245,241,0.88);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      box-shadow: 0 2px 10px rgba(30,58,95,0.10);
+    }
+    .prompt-row { margin-bottom: 6px; gap: 1px; }
+    .prompt-eyebrow { font-size: 0.56rem; letter-spacing: 0.2em; }
+    .prompt-question { font-size: 1rem; line-height: 1.15; }
+    .prompt-sub { font-size: 0.7rem; min-height: 0; }
+    input[type="text"] { padding: 8px 10px; font-size: 0.95rem; }
+    button.icon { width: 38px; }
+    button.primary { padding: 0 12px; font-size: 0.85rem; }
+    .feedback { margin-top: 6px; font-size: 0.8rem; min-height: 16px; }
+    .tries { margin-top: 4px; font-size: 0.6rem; letter-spacing: 0.15em; }
+    .tries .dots { gap: 4px; }
+    .tries .dots span { width: 6px; height: 6px; }
+    .prompt-flag { top: 6px; right: 8px; width: 36px; }
+
+    /* Zoom controls — smaller, tucked in */
+    .zoom-controls { bottom: auto; top: 50%; right: 4px; transform: translateY(-50%); }
+    .zoom-controls button { width: 32px; height: 32px; font-size: 0.9rem; }
+
+    /* Hide footer credit — no room */
+    .hud-footer { display: none; }
+  }
+
+  /* Voice mode on small screens: hide the prompt card chrome entirely,
+     leave only a transparent, compact input floating at the bottom. */
+  @media (max-width: 760px) {
+    body.voice-mode-mobile .hud-prompt {
+      background: transparent;
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+      box-shadow: none;
+      border: none;
+      padding: 4px 8px;
+    }
+    body.voice-mode-mobile .prompt-row { display: none; }
+    body.voice-mode-mobile .feedback,
+    body.voice-mode-mobile .tries { display: none; }
+    body.voice-mode-mobile .prompt-flag { display: none; }
+    body.voice-mode-mobile input[type="text"] {
+      background: rgba(250,248,245,0.55);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      border-color: rgba(194,123,92,0.55);
+      font-size: 0.9rem;
+    }
+    body.voice-mode-mobile button.primary { display: none; }
   }
 </style>
 </head>
@@ -1605,7 +1677,7 @@ function setupMap() {
       .attr("y", pt[1])
       .attr("text-anchor", "middle")
       .style("font-size", (o.labelSize || 14) + "px")
-      .text(o.name);
+      .text("");
   });
 
   zoomBehavior = d3.zoom()
@@ -1665,10 +1737,14 @@ function applyAllHistoryClasses() {
   d3.selectAll(".ocean-label").each(function() {
     const id = this.getAttribute("data-id");
     const h = state.countryHistory.get(id);
+    const o = OCEANS[id];
     const node = d3.select(this);
     node.classed("hist-correct", h === "correct")
         .classed("hist-partial", h === "partial")
         .classed("hist-revealed", h === "revealed");
+    if (o && !node.classed("target")) {
+      node.text(h ? o.name : "");
+    }
   });
 }
 
@@ -1678,11 +1754,13 @@ function clearActiveClasses() {
     .classed("correct-flash", false)
     .classed("wrong-flash", false)
     .classed("revealed", false);
-  // Restore all ocean labels to their real names and remove target class
+  // Ocean labels: hide by default; show name only if it's been answered/revealed.
   d3.selectAll(".ocean-label").each(function() {
     const id = this.getAttribute("data-id");
     const o = OCEANS[id];
-    if (o) d3.select(this).text(o.name).classed("target", false);
+    if (!o) return;
+    const h = state.countryHistory.get(id);
+    d3.select(this).text(h ? o.name : "").classed("target", false);
   });
 }
 
@@ -1713,10 +1791,10 @@ function maybeZoomToTarget(id) {
   const vdiag = Math.hypot(viewW, viewH);
   const tooSmall = diag > 0 && diag / vdiag < 0.06;
   if (tooSmall) {
-    // Fit the country, but softly (scale * 0.6) so surrounding countries are visible.
+    // Fit the country, but softly so surrounding countries are visible.
     const padding = 220;
     const rawScale = Math.min((viewW - padding) / Math.max(w, 1), (viewH - padding) / Math.max(h, 1), 9);
-    const scale = Math.max(rawScale * 0.6, 1);
+    const scale = Math.max(rawScale * 0.42, 1);
     const cx = (bounds[0][0] + bounds[1][0]) / 2;
     const cy = (bounds[0][1] + bounds[1][1]) / 2;
     const t = d3.zoomIdentity.translate(viewW / 2 - cx * scale, viewH / 2 - cy * scale).scale(scale);
@@ -2317,9 +2395,10 @@ function pickBritishVoice() {
   return gbFemale || gbPreferred || anyGB || anyEn || voices[0] || null;
 }
 
-function speakBritish(text) {
-  if (Audio.muted) return;
-  if (!("speechSynthesis" in window)) return;
+function speakBritish(text, onEnd) {
+  const done = () => { try { onEnd && onEnd(); } catch(e) {} };
+  if (Audio.muted) { done(); return; }
+  if (!("speechSynthesis" in window)) { done(); return; }
   try { window.speechSynthesis.cancel(); } catch(e) {}
   const utter = new SpeechSynthesisUtterance(text);
   const v = pickBritishVoice();
@@ -2327,7 +2406,9 @@ function speakBritish(text) {
   utter.rate = 0.95;
   utter.pitch = 1.05;
   utter.volume = 0.9;
-  try { window.speechSynthesis.speak(utter); } catch(e) {}
+  utter.onend = done;
+  utter.onerror = done;
+  try { window.speechSynthesis.speak(utter); } catch(e) { done(); }
 }
 
 function updateLevelBadge() {
@@ -2488,6 +2569,7 @@ function initSpeech() {
 function startListening() {
   if (!state.recognition) return;
   if (state.listening) return;
+  if (state.suppressListening) return;
   try {
     state.recognition.start();
     state.listening = true;
@@ -2519,6 +2601,7 @@ function toggleVoiceMode() {
   if (!state.recognition) return;
   state.voiceMode = !state.voiceMode;
   try { localStorage.setItem("we_voiceMode", JSON.stringify(state.voiceMode)); } catch(e) {}
+  applyVoiceModeClass();
   if (state.voiceMode) {
     hideSuggest();
     startListening();
@@ -2527,6 +2610,10 @@ function toggleVoiceMode() {
     $("answerInput").placeholder = state.stage === STAGE.CAPITAL ? "Type the capital…" : "Type the country…";
     updateSuggestions();
   }
+}
+
+function applyVoiceModeClass() {
+  document.body.classList.toggle("voice-mode-mobile", !!state.voiceMode);
 }
 
 /* =========================================================================
@@ -2646,9 +2733,15 @@ function wire() {
     if (nm) setPlayerName(nm); else applyPlayerName();
     await audioInit();
     const greet = nm || getPlayerName();
-    speakBritish(`Hello, ${greet}! Welcome, Explorer.`);
     $("welcome").classList.remove("show");
     startAmbient(state.level);
+    state.suppressListening = true;
+    speakBritish(`Hello ${greet}, let's explore.`, () => {
+      state.suppressListening = false;
+      if (state.voiceMode && (state.stage === STAGE.COUNTRY || state.stage === STAGE.CAPITAL)) {
+        startListening();
+      }
+    });
     pickNext();
   });
   $("playAgainBtn").addEventListener("click", async () => {
@@ -2777,6 +2870,7 @@ async function load() {
   updateFlagModeUI();
   updateAutoZoomUI();
   applyPlayerName();
+  applyVoiceModeClass();
   wire();
   updateStats();
   // Kick off voices list (speech synthesis)
