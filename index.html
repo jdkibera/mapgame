@@ -2778,7 +2778,15 @@ function speakBritish(text, onEnd) {
   const done = () => { try { onEnd && onEnd(); } catch(e) {} };
   if (Audio.muted) { done(); return; }
   if (!("speechSynthesis" in window)) { done(); return; }
-  try { window.speechSynthesis.cancel(); } catch(e) {}
+  // Only cancel if something is actively speaking/pending. Calling cancel()
+  // unconditionally appears to break the user-gesture token on some
+  // browsers (Chrome mobile in particular) — the follow-up speak() then
+  // silently fails.
+  try {
+    if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+      window.speechSynthesis.cancel();
+    }
+  } catch(e) {}
   const utter = new SpeechSynthesisUtterance(text);
   const v = pickBritishVoice();
   if (v) { utter.voice = v; utter.lang = v.lang; } else { utter.lang = "en-GB"; }
@@ -3271,24 +3279,11 @@ function wire() {
       : `Hello ${state.players[0].name}, let's explore.`;
 
     // === iOS / Chrome-mobile gesture window ===
-    // Everything permission-sensitive must run synchronously inside this
-    // click handler, before any `await`. Three things are primed here:
-    //   1. speechSynthesis — prime with a silent utterance, then speak
-    //      the greeting so the voice actually plays on mobile browsers.
-    //   2. microphone permission via getUserMedia — one prompt, then we
-    //      hold the stream so Chrome stops popping its "access allowed"
-    //      pill on every SpeechRecognition restart.
-    //   3. SpeechRecognition is started from this same gesture.
-
-    // 1. Prime + speak. The silent utterance unlocks speechSynthesis on
-    //    browsers that need a user-gesture-scoped call first (iOS Chrome).
-    if ("speechSynthesis" in window) {
-      try {
-        const prime = new SpeechSynthesisUtterance(" ");
-        prime.volume = 0;
-        window.speechSynthesis.speak(prime);
-      } catch(e) {}
-    }
+    // Permission-sensitive work must run synchronously inside this click
+    // handler, before any `await`. The greeting speak() must be the FIRST
+    // speechSynthesis call in the gesture — no silent-prime or unconditional
+    // cancel() beforehand, both of which consumed the gesture token on
+    // Chrome mobile and left the real greeting silent.
     state.suppressListening = true;
     const releaseListening = () => {
       if (!state.suppressListening) return;
