@@ -894,6 +894,45 @@
     .hud-footer { display: none; }
   }
 
+  /* Portrait mobile — show the map in landscape orientation as a visual
+     cue for the user to rotate the device. HUD stays in normal orientation. */
+  @media (max-width: 760px) and (orientation: portrait) {
+    #mapWrap {
+      top: 0;
+      left: 100vw;
+      width: 100vh;
+      height: 100vw;
+      transform-origin: top left;
+      transform: rotate(90deg);
+    }
+    /* A subtle hint in the center telling the user to rotate. */
+    .rotate-hint {
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(30,58,95,0.82);
+      color: var(--cream);
+      padding: 10px 16px;
+      border-radius: 22px;
+      font-family: var(--font-body);
+      font-size: 0.8rem;
+      letter-spacing: 0.08em;
+      display: flex; align-items: center; gap: 8px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+      pointer-events: none;
+      z-index: 30;
+      animation: rotateHintPulse 2.4s ease-in-out infinite;
+    }
+    .rotate-hint svg { width: 18px; height: 18px; }
+  }
+  @media (min-width: 761px), (orientation: landscape) {
+    .rotate-hint { display: none; }
+  }
+  @keyframes rotateHintPulse {
+    0%, 100% { opacity: 0.92; }
+    50% { opacity: 0.55; }
+  }
+
   /* Voice mode on small screens: hide the prompt card chrome entirely,
      leave only a transparent, compact input floating at the bottom. */
   @media (max-width: 760px) {
@@ -924,6 +963,11 @@
 
 <div id="mapWrap">
   <svg id="map"></svg>
+</div>
+
+<div class="rotate-hint" id="rotateHint" aria-hidden="true">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15.5-6.3L21 8"/><polyline points="21 3 21 8 16 8"/><path d="M21 12a9 9 0 0 1-15.5 6.3L3 16"/><polyline points="3 21 3 16 8 16"/></svg>
+  <span>Rotate your phone</span>
 </div>
 
 <div class="tooltip" id="tooltip"></div>
