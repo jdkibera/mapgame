@@ -3207,9 +3207,32 @@ function setStudyMode(mode) {
 /* =========================================================================
    EVENTS
    ========================================================================= */
+// Prime mic permission on the welcome screen's first user gesture. Granting
+// permission before the Start click avoids Chrome's ~15s speechSynthesis
+// stall that happens when the permission dialog competes with a speak().
+let _micPrimed = false;
+function primeMicPermission() {
+  if (_micPrimed) return;
+  _micPrimed = true;
+  if (!state.voiceMode) return;
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
+  navigator.mediaDevices.getUserMedia({ audio: true })
+    .then(stream => { state.micStream = stream; })
+    .catch(() => { /* user denied — speakBritish will still run */ });
+}
+
 function wire() {
   $("submitBtn").addEventListener("click", submitAnswer);
   $("micBtn").addEventListener("click", toggleVoiceMode);
+
+  // Prime mic on first interaction with anything on the welcome card —
+  // focusing a name input, tapping a mode tab, or touching the card itself.
+  const welcomeCard = document.querySelector("#welcome .card");
+  if (welcomeCard) {
+    const primeOnce = () => primeMicPermission();
+    welcomeCard.addEventListener("pointerdown", primeOnce, { once: true });
+    welcomeCard.addEventListener("focusin", primeOnce, { once: true });
+  }
   const menuBtn = document.getElementById("mobileMenuBtn");
   if (menuBtn) {
     menuBtn.addEventListener("click", () => {
