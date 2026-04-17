@@ -881,10 +881,17 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15 8 22 9 17 14 18 21 12 18 6 21 7 14 2 9 9 8 12 2"/></svg>
     <select id="levelSelect" title="Jump to level">
       <option value="1">Level I — Home Waters</option>
-      <option value="2">Level II — Foreign Shores</option>
-      <option value="3">Level III — Uncharted Seas</option>
-      <option value="4">Level IV — Terra Incognita</option>
-      <option value="5">Level V — Edge of the World</option>
+      <option value="2">Level II — The Great Capitals</option>
+      <option value="3">Level III — Foreign Shores</option>
+      <option value="4">Level IV — The Trade Winds</option>
+      <option value="5">Level V — Uncharted Seas</option>
+      <option value="6">Level VI — The Spice Routes</option>
+      <option value="7">Level VII — Monsoon Lanes</option>
+      <option value="8">Level VIII — Terra Incognita</option>
+      <option value="9">Level IX — The Hinterlands</option>
+      <option value="10">Level X — Forgotten Kingdoms</option>
+      <option value="11">Level XI — The Edge of the World</option>
+      <option value="12">Level XII — Here Be Dragons</option>
     </select>
   </button>
   <button class="tbtn" id="regionBtn" title="Filter by region">
@@ -898,6 +905,10 @@
       <option value="Oceania">Oceania</option>
       <option value="Oceans">Oceans</option>
     </select>
+  </button>
+  <button class="tbtn" id="zoomToggleBtn" title="Auto-zoom on small countries">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+    <span class="label">Zoom</span>
   </button>
   <button class="tbtn" id="flagBtn" title="Flag mode — show the country's flag while you guess">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
@@ -1248,10 +1259,10 @@ const COUNTRIES = {
    ========================================================================= */
 const OCEANS = {
   "OCEAN_PAC": { name: "Pacific Ocean",   alt: ["Pacific"],                center: [-160, 15], labelSize: 18, tier: 1 },
-  "OCEAN_ATL": { name: "Atlantic Ocean",  alt: ["Atlantic"],               center: [-30,  25], labelSize: 17, tier: 1 },
-  "OCEAN_IND": { name: "Indian Ocean",    alt: ["Indian"],                 center: [ 75, -18], labelSize: 16, tier: 2 },
-  "OCEAN_ARC": { name: "Arctic Ocean",    alt: ["Arctic"],                 center: [  0,  78], labelSize: 13, tier: 3 },
-  "OCEAN_SOU": { name: "Southern Ocean",  alt: ["Antarctic Ocean","Antarctic"], center: [0, -58], labelSize: 14, tier: 4 }
+  "OCEAN_ATL": { name: "Atlantic Ocean",  alt: ["Atlantic"],               center: [-30,  25], labelSize: 17, tier: 2 },
+  "OCEAN_IND": { name: "Indian Ocean",    alt: ["Indian"],                 center: [ 75, -18], labelSize: 16, tier: 3 },
+  "OCEAN_ARC": { name: "Arctic Ocean",    alt: ["Arctic"],                 center: [  0,  78], labelSize: 13, tier: 6 },
+  "OCEAN_SOU": { name: "Southern Ocean",  alt: ["Antarctic Ocean","Antarctic"], center: [0, -58], labelSize: 14, tier: 10 }
 };
 Object.entries(OCEANS).forEach(([id, o]) => {
   COUNTRIES[id] = { name: o.name, alt: o.alt, region: "Oceans", ocean: true, labelSize: o.labelSize, center: o.center, capital: null };
@@ -1261,62 +1272,30 @@ Object.entries(OCEANS).forEach(([id, o]) => {
    TIERS — five progressive levels of difficulty
    ========================================================================= */
 const TIERS = [
-  {
-    key: 1,
-    roman: "I",
-    name: "Home Waters",
-    subtitle: "Familiar Shores",
-    ids: [
-      "840","124","484","076","032","826","250","276","380","724","643","300",
-      "528","620","752","756","616","372","156","392","356","410","792","764",
-      "818","710","036","554"
-    ]
-  },
-  {
-    key: 2,
-    roman: "II",
-    name: "Foreign Shores",
-    subtitle: "Beyond the Horizon",
-    ids: [
-      "578","246","208","352","040","056","348","203","642","804","688","191",
-      "192","388","214","152","604","170","862","360","608","704","458","682",
-      "376","504","566","404","231"
-    ]
-  },
-  {
-    key: 3,
-    roman: "III",
-    name: "Uncharted Seas",
-    subtitle: "Into the Unknown",
-    ids: [
-      "050","004","364","368","586","408","784","634","414","760","422","400",
-      "512","887","144","524","104","116","418","496","158","398","012","788",
-      "434","288","320","188","591","332","068","218","858","600","100"
-    ]
-  },
-  {
-    key: 4,
-    roman: "IV",
-    name: "Terra Incognita",
-    subtitle: "Lands Unmapped",
-    ids: [
-      "860","031","268","051","417","762","795","064","096","626","275","440",
-      "428","233","498","112","703","705","008","070","499","807","442","196",
-      "222","340","558","044","780","084","686","384","120","834","800","716",
-      "894","024","508","450"
-    ]
-  },
-  {
-    key: 5,
-    roman: "V",
-    name: "The Edge of the World",
-    subtitle: "Here Be Dragons",
-    ids: [
-      "706","729","728","180","178","466","854","562","148","516","072","646",
-      "108","454","426","748","694","430","324","624","478","270","768","204",
-      "262","232","140","266","226","328","740","304","242","598","548","090","540"
-    ]
-  }
+  { key: 1,  roman: "I",    name: "Home Waters",           subtitle: "Familiar Shores",
+    ids: ["840","124","484","076","826","250","276","380","724","156","392","356","036","554"] },
+  { key: 2,  roman: "II",   name: "The Great Capitals",    subtitle: "Bastions of Trade",
+    ids: ["032","643","300","528","620","752","756","616","372","410","764","792","818","710"] },
+  { key: 3,  roman: "III",  name: "Foreign Shores",        subtitle: "Beyond the Horizon",
+    ids: ["578","246","208","352","040","056","348","203","642","804","688","191","192","388"] },
+  { key: 4,  roman: "IV",   name: "The Trade Winds",       subtitle: "Ports Along the Way",
+    ids: ["214","152","604","170","862","360","608","704","458","682","376","504","566","404","231"] },
+  { key: 5,  roman: "V",    name: "Uncharted Seas",        subtitle: "Into the Unknown",
+    ids: ["050","004","364","368","586","408","784","634","414","760","422","400"] },
+  { key: 6,  roman: "VI",   name: "The Spice Routes",      subtitle: "Ancient Crossings",
+    ids: ["512","887","144","524","104","116","418","496","158","398","012"] },
+  { key: 7,  roman: "VII",  name: "Monsoon Lanes",         subtitle: "Across Warm Seas",
+    ids: ["788","434","288","320","188","591","332","068","218","858","600","100"] },
+  { key: 8,  roman: "VIII", name: "Terra Incognita",       subtitle: "Lands Unmapped",
+    ids: ["860","031","268","051","417","762","795","064","096","626","275","440","428"] },
+  { key: 9,  roman: "IX",   name: "The Hinterlands",       subtitle: "Deep in the Wild",
+    ids: ["233","498","112","703","705","008","070","499","807","442","196","222","340"] },
+  { key: 10, roman: "X",    name: "Forgotten Kingdoms",    subtitle: "Empires in Shadow",
+    ids: ["558","044","780","084","686","384","120","834","800","716","894","024","508","450"] },
+  { key: 11, roman: "XI",   name: "The Edge of the World", subtitle: "Where Maps End",
+    ids: ["706","729","728","180","178","466","854","562","148","516","072","646","108","454","426","748","694","430","324"] },
+  { key: 12, roman: "XII",  name: "Here Be Dragons",       subtitle: "Beyond All Knowing",
+    ids: ["624","478","270","768","204","262","232","140","266","226","328","740","304","242","598","548","090","540"] }
 ];
 
 // Append oceans into their assigned tiers (after TIERS is declared so we can mutate the arrays)
@@ -1388,7 +1367,9 @@ let state = {
   studyMapMode: false,
   flagMode: false,
   autoAdvanceTimer: null,
+  autoZoom: true,
 };
+try { state.autoZoom = JSON.parse(localStorage.getItem("we_autoZoom") || "true"); } catch(e) {}
 try { state.flagMode = JSON.parse(localStorage.getItem("we_flagMode") || "false"); } catch(e) {}
 try { state.best = Number(localStorage.getItem("we_best") || 0) || 0; } catch(e) { state.best = 0; }
 
@@ -1693,13 +1674,19 @@ function clearActiveClasses() {
     .classed("correct-flash", false)
     .classed("wrong-flash", false)
     .classed("revealed", false);
-  d3.selectAll(".ocean-label").classed("target", false);
+  // Restore all ocean labels to their real names and remove target class
+  d3.selectAll(".ocean-label").each(function() {
+    const id = this.getAttribute("data-id");
+    const o = OCEANS[id];
+    if (o) d3.select(this).text(o.name).classed("target", false);
+  });
 }
 
 function highlightTarget(id) {
   const meta = COUNTRIES[id];
   if (meta && meta.ocean) {
-    d3.select("#oceanLabel_" + id).classed("target", true);
+    // Hide the name while it's the target so the player has to know which ocean it is.
+    d3.select("#oceanLabel_" + id).classed("target", true).text("• • •");
   } else {
     gMap.selectAll("path.country").filter(d => d.id === id).classed("target", true);
   }
@@ -1707,29 +1694,53 @@ function highlightTarget(id) {
 
 function maybeZoomToTarget(id) {
   // Zoom in if the country is too small to easily see at default scale.
+  if (!state.autoZoom) {
+    svg.transition().duration(450).call(zoomBehavior.transform, d3.zoomIdentity);
+    return;
+  }
   const feat = state.features.find(f => f.id === id);
   if (!feat || !pathGen || !zoomBehavior) return;
-  const bounds = pathGen.bounds(feat); // [[x0,y0], [x1,y1]] in the UNTRANSFORMED svg coords
+  const bounds = pathGen.bounds(feat);
   const w = bounds[1][0] - bounds[0][0];
   const h = bounds[1][1] - bounds[0][1];
   const rect = svg.node().getBoundingClientRect();
   const viewW = rect.width, viewH = rect.height;
-  // Heuristic: if the country's bounding diagonal is < 6% of viewport diag, zoom in.
   const diag = Math.hypot(w, h);
   const vdiag = Math.hypot(viewW, viewH);
   const tooSmall = diag > 0 && diag / vdiag < 0.06;
   if (tooSmall) {
-    // Fit the country inside a comfortable frame (~ 1/3 of the viewport)
+    // Fit the country, but softly (scale * 0.6) so surrounding countries are visible.
     const padding = 220;
-    const scale = Math.min((viewW - padding) / Math.max(w, 1), (viewH - padding) / Math.max(h, 1), 9);
+    const rawScale = Math.min((viewW - padding) / Math.max(w, 1), (viewH - padding) / Math.max(h, 1), 9);
+    const scale = Math.max(rawScale * 0.6, 1);
     const cx = (bounds[0][0] + bounds[1][0]) / 2;
     const cy = (bounds[0][1] + bounds[1][1]) / 2;
     const t = d3.zoomIdentity.translate(viewW / 2 - cx * scale, viewH / 2 - cy * scale).scale(scale);
     svg.transition().duration(750).call(zoomBehavior.transform, t);
   } else {
-    // Reset to default for larger countries so the map isn't stuck zoomed
     svg.transition().duration(450).call(zoomBehavior.transform, d3.zoomIdentity);
   }
+}
+
+function toggleAutoZoom() {
+  state.autoZoom = !state.autoZoom;
+  try { localStorage.setItem("we_autoZoom", JSON.stringify(state.autoZoom)); } catch(e) {}
+  updateAutoZoomUI();
+  // If turning off, reset the map zoom; if turning on, re-apply if there's a current target
+  if (!state.autoZoom) {
+    svg.transition().duration(450).call(zoomBehavior.transform, d3.zoomIdentity);
+  } else if (state.currentId) {
+    const meta = COUNTRIES[state.currentId];
+    if (meta && !meta.ocean) maybeZoomToTarget(state.currentId);
+  }
+}
+
+function updateAutoZoomUI() {
+  const btn = $("zoomToggleBtn");
+  if (!btn) return;
+  btn.classList.toggle("toggled", state.autoZoom);
+  const label = btn.querySelector(".label");
+  if (label) label.textContent = state.autoZoom ? "Zoom on" : "Zoom";
 }
 
 function recordHistory(id, outcome) {
@@ -1932,7 +1943,7 @@ function pickNext() {
   const remaining = state.pool.filter(id => !state.answered.has(id));
   if (remaining.length === 0) {
     // Level complete
-    if (state.level < 5) {
+    if (state.level < TIERS.length) {
       state.level += 1;
       state.answered = new Set();
       rebuildPool();
@@ -2006,7 +2017,7 @@ function submitAnswer() {
         try { localStorage.setItem("we_best", String(state.best)); } catch(e) {}
       }
       if (meta.ocean) {
-        d3.select("#oceanLabel_" + state.currentId).classed("target", false);
+        d3.select("#oceanLabel_" + state.currentId).classed("target", false).text(meta.name);
       } else {
         gMap.selectAll("path.country").filter(d => d.id === state.currentId)
           .classed("target", false).classed("correct-flash", true);
@@ -2080,7 +2091,7 @@ function revealCountry(meta) {
   state.stage = STAGE.RESOLVED;
   state.streak = 0;
   if (meta.ocean) {
-    d3.select("#oceanLabel_" + state.currentId).classed("target", false);
+    d3.select("#oceanLabel_" + state.currentId).classed("target", false).text(meta.name);
   } else {
     gMap.selectAll("path.country").filter(d => d.id === state.currentId)
       .classed("target", false).classed("revealed", true);
@@ -2375,7 +2386,7 @@ function showLevelUp() {
 function showVictory() {
   $("victory").classList.add("show");
   $("victoryStats").innerHTML =
-    `You conquered all five levels with a final score of <strong>${state.score}</strong>. Best streak: <strong>${state.best}</strong>.`;
+    `You conquered all ${TIERS.length} levels with a final score of <strong>${state.score}</strong>. Best streak: <strong>${state.best}</strong>.`;
   // Big finale confetti + victory fanfare
   playVictorySfx();
   for (let i = 0; i < 3; i++) setTimeout(fireConfetti, i * 220);
@@ -2561,8 +2572,7 @@ function openStudy() {
   // Hide the welcome overlay while studying so the map is visible behind map-mode
   $("welcome").classList.remove("show");
   $("studyModal").classList.add("show");
-  setStudyMode("list");
-  $("studySearch").focus();
+  setStudyMode("map");
 }
 function closeStudy() {
   $("studyModal").classList.remove("show");
@@ -2644,6 +2654,7 @@ function wire() {
     toggleMute();
   });
   $("flagBtn").addEventListener("click", toggleFlagMode);
+  $("zoomToggleBtn").addEventListener("click", toggleAutoZoom);
   $("triesRow").addEventListener("click", onAdvanceTap);
   $("triesRow").addEventListener("keydown", (e) => {
     if (e.key === "Enter" || e.key === " " || e.code === "Space") { e.preventDefault(); onAdvanceTap(); }
@@ -2757,6 +2768,7 @@ async function load() {
   buildStudyModal();
   updateLevelBadge();
   updateFlagModeUI();
+  updateAutoZoomUI();
   applyPlayerName();
   wire();
   updateStats();
