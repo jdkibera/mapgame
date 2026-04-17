@@ -2811,21 +2811,17 @@ function pickBritishVoice() {
   return gbFemale || femaleEn || anyGB || anyEn || voices[0] || null;
 }
 
-function speakBritish(text, onEnd) {
-  const done = () => { try { onEnd && onEnd(); } catch(e) {} };
-  if (Audio.muted) { done(); return; }
-  if (!("speechSynthesis" in window)) { done(); return; }
+function speakBritish(text) {
+  if (Audio.muted) return;
+  if (!("speechSynthesis" in window)) return;
   try { window.speechSynthesis.cancel(); } catch(e) {}
   const utter = new SpeechSynthesisUtterance(text);
   const v = pickBritishVoice();
-  if (v) utter.voice = v;
-  utter.lang = (v && v.lang) || "en-GB";
-  utter.rate = 1.0;
+  if (v) { utter.voice = v; utter.lang = v.lang; } else { utter.lang = "en-GB"; }
+  utter.rate = 0.95;
   utter.pitch = 1.05;
-  utter.volume = 1.0;
-  utter.onend = done;
-  utter.onerror = done;
-  try { window.speechSynthesis.speak(utter); } catch(e) { done(); }
+  utter.volume = 0.9;
+  try { window.speechSynthesis.speak(utter); } catch(e) {}
 }
 
 function updateLevelBadge() {
@@ -3179,34 +3175,10 @@ function setStudyMode(mode) {
 /* =========================================================================
    EVENTS
    ========================================================================= */
-// Ask for mic permission on the welcome screen's first user gesture so
-// the prompt never lands on the map page. We grab a one-shot stream
-// purely to trigger the permission grant, then immediately release its
-// tracks — we don't hold a persistent stream.
-let _permissionRequested = false;
-function primeMicPermission() {
-  if (_permissionRequested) return;
-  _permissionRequested = true;
-  if (!state.voiceMode) return;
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
-  navigator.mediaDevices.getUserMedia({ audio: true })
-    .then(stream => { stream.getTracks().forEach(t => t.stop()); })
-    .catch(() => {});
-}
-
 function wire() {
   $("submitBtn").addEventListener("click", submitAnswer);
   $("micBtn").addEventListener("click", toggleVoiceMode);
 
-  // Ask for mic permission on the FIRST interaction with the welcome
-  // overlay (not the card — the overlay covers the full viewport, so any
-  // tap anywhere on the welcome page counts, including taps that fall on
-  // the overlay background outside the card).
-  const welcomeOverlay = document.getElementById("welcome");
-  if (welcomeOverlay) {
-    welcomeOverlay.addEventListener("pointerdown", primeMicPermission);
-    welcomeOverlay.addEventListener("focusin", primeMicPermission);
-  }
   const menuBtn = document.getElementById("mobileMenuBtn");
   if (menuBtn) {
     menuBtn.addEventListener("click", () => {
@@ -3300,7 +3272,7 @@ function wire() {
     });
   }
 
-  $("startBtn").addEventListener("click", () => {
+  $("startBtn").addEventListener("click", async () => {
     // Build the players list from whichever pane is active.
     if (selectedMode === "multi") {
       const names = [...document.querySelectorAll(".player-name")]
@@ -3329,29 +3301,19 @@ function wire() {
       ? `Hello explorers — ${state.players.map(p => p.name).join(", ")}. ${firstUp}, you're up first.`
       : `Hello ${state.players[0].name}, let's explore.`;
 
-    // Speak the greeting and hold the mic off until it finishes (so the
-    // mic doesn't capture the agent's voice). If speech fails for any
-    // reason, a 5-second safety timer releases the mic lock anyway.
+    // Hold the mic closed for ~5s while the greeting plays, so the mic
+    // doesn't capture the agent's voice. (In the original code the mic
+    // just ran over the greeting; we keep the suppression because voice
+    // mode is on by default now.)
     state.suppressListening = true;
-    let released = false;
-    const releaseListening = () => {
-      if (released) return;
-      released = true;
-      state.suppressListening = false;
-      if (state.voiceMode && state.recognition &&
-          (state.stage === STAGE.COUNTRY || state.stage === STAGE.CAPITAL)) {
-        startListening();
-      }
-    };
-    speakBritish(greet, releaseListening);
-    setTimeout(releaseListening, 5000);
+    setTimeout(() => { state.suppressListening = false; }, 5000);
 
+    // --- same shape as the original working version ---
+    await audioInit();
+    speakBritish(greet);
     $("welcome").classList.remove("show");
+    startAmbient(state.level);
     pickNext();
-    (async () => {
-      try { await audioInit(); } catch(e) {}
-      startAmbient(state.level);
-    })();
   });
   $("playAgainBtn").addEventListener("click", async () => {
     await audioInit();
