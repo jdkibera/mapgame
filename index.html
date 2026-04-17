@@ -400,6 +400,18 @@
   }
   .tries .dot.used { background: var(--copper); border-color: var(--copper-dark); }
   .tries .hint-text { font-style: italic; letter-spacing: 0.08em; text-transform: none; font-size: 0.8rem; }
+  .tries {
+    cursor: pointer;
+    user-select: none;
+    padding: 6px 10px;
+    border-radius: 8px;
+    transition: background 0.15s, color 0.15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .tries:hover { background: var(--cream); }
+  .tries:hover .hint-text { color: var(--navy); }
+  .tries:active { background: var(--copper-pale); }
+  .tries:focus { outline: 2px solid var(--copper-light); outline-offset: 2px; }
 
   /* Tooltip */
   .tooltip {
@@ -833,13 +845,13 @@
     <button class="primary" id="submitBtn">Submit</button>
   </div>
   <div class="feedback" id="feedback"></div>
-  <div class="tries">
+  <div class="tries" id="triesRow" role="button" tabindex="0" title="Tap to advance">
     <span class="dots" id="triesDots">
       <span class="dot"></span><span class="dot"></span><span class="dot"></span>
     </span>
     <span>tries</span>
     <span style="color:var(--line-soft)">·</span>
-    <span class="hint-text"><span class="kbd">Space</span> advance · <span class="kbd">Enter</span> submit</span>
+    <span class="hint-text">Tap or <span class="kbd">Space</span> advance · <span class="kbd">Enter</span> submit</span>
   </div>
 </section>
 
@@ -1258,6 +1270,7 @@ let state = {
   recognition: null,
   studyMapMode: false,
   flagMode: false,
+  autoAdvanceTimer: null,
 };
 try { state.flagMode = JSON.parse(localStorage.getItem("we_flagMode") || "false"); } catch(e) {}
 try { state.best = Number(localStorage.getItem("we_best") || 0) || 0; } catch(e) { state.best = 0; }
@@ -1607,6 +1620,7 @@ function rebuildPool() {
 }
 
 function pickNext() {
+  cancelAutoAdvance();
   const remaining = state.pool.filter(id => !state.answered.has(id));
   if (remaining.length === 0) {
     // Level complete
@@ -1740,7 +1754,7 @@ function revealCountry(meta) {
     .classed("target", false).classed("revealed", true);
   recordHistory(state.currentId, "revealed");
   showFeedback("reveal", `The answer was ${meta.name}. Its capital is ${meta.capital}.`);
-  $("promptSub").textContent = "Press Space for the next country";
+  $("promptSub").textContent = "Tap below or press Space for the next country";
   $("answerInput").disabled = true;
   $("submitBtn").disabled = true;
   state.answered.add(state.currentId);
@@ -1750,6 +1764,7 @@ function revealCountry(meta) {
   speakBritish(`The answer was ${meta.name}. Its capital is ${meta.capital}.`);
   updateStats();
   updateSuggestions();
+  scheduleAutoAdvance(3500);
 }
 
 function revealCapital(meta) {
@@ -1766,10 +1781,11 @@ function resolveCurrent() {
   $("answerInput").disabled = true;
   $("submitBtn").disabled = true;
   state.answered.add(state.currentId);
-  $("promptSub").textContent = "Press Space for the next country";
+  $("promptSub").textContent = "Tap below or press Space for the next country";
   stopListening();
   updateStats();
   updateSuggestions();
+  scheduleAutoAdvance(3000);
 }
 
 function advance() {
@@ -1809,6 +1825,28 @@ function updateStats() {
   $("streak").textContent = state.streak;
   $("seen").textContent = `${state.answered.size} / ${state.pool.length}`;
   $("best").textContent = state.best;
+}
+
+/* Auto-advance after a question resolves (for iPad-friendly play) */
+function scheduleAutoAdvance(delay = 3000) {
+  cancelAutoAdvance();
+  state.autoAdvanceTimer = setTimeout(() => {
+    if (state.stage === STAGE.RESOLVED) pickNext();
+  }, delay);
+}
+function cancelAutoAdvance() {
+  if (state.autoAdvanceTimer) { clearTimeout(state.autoAdvanceTimer); state.autoAdvanceTimer = null; }
+}
+
+/* Single handler used by Space / Tap / click — skips or advances based on stage */
+function onAdvanceTap() {
+  cancelAutoAdvance();
+  if (state.stage === STAGE.COUNTRY) {
+    const meta = COUNTRIES[state.currentId];
+    if (meta) revealCountry(meta);
+    return;
+  }
+  advance();
 }
 
 function showPromptFlag(id) {
@@ -2012,6 +2050,7 @@ function showVictory() {
    RESET
    ========================================================================= */
 function resetGame(toLevel) {
+  cancelAutoAdvance();
   state.answered = new Set();
   state.countryHistory = new Map();
   state.score = 0;
@@ -2036,6 +2075,7 @@ function resetGame(toLevel) {
 
 function jumpToLevel(lvl) {
   // Preserve history, change level, reset progress-within-level
+  cancelAutoAdvance();
   state.level = lvl;
   state.answered = new Set();
   rebuildPool();
@@ -2242,6 +2282,10 @@ function wire() {
     toggleMute();
   });
   $("flagBtn").addEventListener("click", toggleFlagMode);
+  $("triesRow").addEventListener("click", onAdvanceTap);
+  $("triesRow").addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " " || e.code === "Space") { e.preventDefault(); onAdvanceTap(); }
+  });
   $("factsClose").addEventListener("click", closeFacts);
   $("factsModal").addEventListener("click", (e) => { if (e.target.id === "factsModal") closeFacts(); });
   $("zoomIn").addEventListener("click", () => svg.transition().call(zoomBehavior.scaleBy, 1.5));
