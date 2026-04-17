@@ -518,6 +518,9 @@
     display: none; align-items: center; justify-content: center;
     z-index: 40;
     backdrop-filter: blur(2px);
+    overflow-y: auto;
+    padding: 20px;
+    -webkit-overflow-scrolling: touch;
   }
   .overlay.show { display: flex; }
   .overlay .card {
@@ -528,6 +531,7 @@
     max-width: 480px;
     text-align: center;
     box-shadow: 0 12px 40px rgba(30,58,95,0.14);
+    margin: auto;
   }
   .overlay h2 {
     font-family: var(--font-heading);
@@ -892,6 +896,15 @@
 
     /* Hide footer credit — no room */
     .hud-footer { display: none; }
+
+    /* Welcome/victory cards: fit everything including the Begin button */
+    .overlay { padding: 12px; }
+    .overlay .card { padding: 20px 18px; max-width: 100%; }
+    .overlay h2 { font-size: 1.5rem; margin-bottom: 6px; }
+    .overlay .flourish { font-size: 0.65rem; margin-bottom: 10px; }
+    .overlay p { font-size: 0.85rem; margin: 0 0 12px 0; line-height: 1.4; }
+    .name-field label { font-size: 0.85rem; }
+    .name-field input[type="text"] { padding: 8px 10px; font-size: 0.9rem; }
   }
 
   /* Portrait mobile — show the map in landscape orientation as a visual
@@ -1095,7 +1108,7 @@
       <label for="nameInput">Your name, Explorer —</label>
       <input type="text" id="nameInput" placeholder="Tallulah" maxlength="24" autocomplete="off" spellcheck="false" />
     </div>
-    <p style="font-size:0.85rem;">Progress through five levels, from <em>Home Waters</em> to the <em>Edge of the World</em>. Use <span class="kbd">Space</span> to advance, <span class="kbd">Enter</span> to submit, and the <strong>🎤</strong> to switch to voice mode (stays on).</p>
+    <p style="font-size:0.85rem;">Progress through twelve levels, from <em>Home Waters</em> to <em>Here Be Dragons</em>. Use <span class="kbd">Space</span> to advance, <span class="kbd">Enter</span> to submit, and the <strong>🎤</strong> to switch to voice mode (stays on).</p>
     <div style="display:flex; flex-direction:column; align-items:center; gap:10px;">
       <button class="primary" id="startBtn" style="padding:10px 24px; font-size:1rem;">Begin Voyage</button>
       <a class="secondary-link" id="studyFromWelcome">Browse all countries first →</a>
