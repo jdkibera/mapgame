@@ -1,0 +1,1200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>World Explorer — A Map Game</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,300;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --copper: #C27B5C;
+    --copper-dark: #8C4A2C;
+    --copper-light: #D4A088;
+    --copper-pale: #F0DDD4;
+    --navy: #1E3A5F;
+    --navy-soft: #3A5578;
+    --cream: #FAF8F5;
+    --warm-gray: #F5F3EF;
+    --card-bg: #F7F5F1;
+    --card-border: #EAE6DF;
+    --line-soft: #E5E0DA;
+    --text-dark: #3A3A3A;
+    --text-med: #6B6B6B;
+    --text-light: #999999;
+    --charcoal: #2D2D2D;
+
+    --ocean: #E4EAF0;
+    --ocean-deep: #D3DCE6;
+    --land: #E2DAD0;
+    --land-stroke: #D0C8BE;
+    --graticule: #B8C6D4;
+
+    --good: #6E8B6E;       /* muted sage */
+    --good-soft: #D7E1D4;
+    --bad: #B85F4F;        /* muted terracotta */
+    --bad-soft: #EED6CF;
+
+    --font-heading: 'Cormorant Garamond', Georgia, serif;
+    --font-body: 'Source Serif 4', Georgia, serif;
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    height: 100%; overflow: hidden;
+    background: var(--warm-gray);
+    color: var(--text-dark);
+    font-family: var(--font-body);
+    font-weight: 400;
+  }
+
+  /* Full-bleed map */
+  #mapWrap {
+    position: fixed; inset: 0;
+    background:
+      radial-gradient(ellipse at center, var(--ocean) 0%, var(--ocean-deep) 90%);
+  }
+  svg#map { width: 100%; height: 100%; display: block; }
+
+  .country {
+    fill: var(--land);
+    stroke: var(--land-stroke);
+    stroke-width: 0.5;
+    transition: fill 0.2s ease, stroke 0.2s ease;
+  }
+  .country.hover { fill: #D7CDBF; cursor: help; }
+  .country.target {
+    fill: var(--copper);
+    stroke: var(--copper-dark);
+    stroke-width: 1.1;
+  }
+  .country.correct { fill: var(--good); stroke: #4A6348; }
+  .country.wrong-flash { fill: var(--bad); stroke: #8C3F32; }
+  .country.revealed { fill: var(--navy); stroke: #0E2440; }
+
+  .graticule { fill: none; stroke: var(--graticule); stroke-width: 0.35; stroke-opacity: 0.6; }
+  .equator { stroke: var(--graticule); stroke-width: 0.5; stroke-dasharray: 3 5; fill: none; }
+  .sphere { fill: none; stroke: var(--land-stroke); stroke-width: 0.6; }
+
+  /* HUD — parchment cards */
+  .hud {
+    position: fixed;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    box-shadow: 0 6px 24px rgba(30,58,95,0.08), 0 1px 2px rgba(0,0,0,0.04);
+  }
+
+  .hud-title {
+    top: 18px; left: 18px;
+    padding: 14px 20px 12px 20px;
+    max-width: 360px;
+  }
+  .hud-title h1 {
+    margin: 0;
+    font-family: var(--font-heading);
+    font-weight: 500;
+    font-size: 1.75rem;
+    color: var(--navy);
+    letter-spacing: 0.02em;
+  }
+  .hud-title .subtitle {
+    margin-top: 2px;
+    font-size: 0.78rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-med);
+    font-style: italic;
+  }
+
+  .hud-score {
+    top: 18px; right: 18px;
+    padding: 10px 16px;
+    display: flex; gap: 20px; align-items: baseline;
+    font-family: var(--font-heading);
+  }
+  .hud-score .stat { display: flex; flex-direction: column; align-items: center; min-width: 54px; }
+  .hud-score .label {
+    font-family: var(--font-body);
+    font-size: 0.65rem; letter-spacing: 0.22em;
+    text-transform: uppercase; color: var(--text-light);
+    font-style: italic;
+  }
+  .hud-score .value { font-size: 1.5rem; font-weight: 500; color: var(--navy); font-variant-numeric: tabular-nums; }
+  .hud-score .sep { width: 1px; background: var(--line-soft); align-self: stretch; }
+
+  .hud-settings {
+    top: 110px; right: 18px;
+    padding: 10px 14px;
+    display: flex; flex-direction: column; gap: 8px;
+    font-size: 0.85rem;
+  }
+  .hud-settings label {
+    display: flex; align-items: center; gap: 8px;
+    color: var(--text-med);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    font-size: 0.7rem;
+  }
+  .hud-settings select {
+    background: var(--cream);
+    border: 1px solid var(--card-border);
+    color: var(--text-dark);
+    padding: 5px 10px; border-radius: 6px;
+    font-family: var(--font-body); font-size: 0.9rem;
+    outline: none;
+  }
+  .hud-settings select:focus { border-color: var(--copper); }
+
+  /* Prompt card — bottom center, travel journal style */
+  .hud-prompt {
+    bottom: 22px; left: 50%; transform: translateX(-50%);
+    width: min(640px, calc(100vw - 36px));
+    padding: 20px 26px 18px 26px;
+  }
+  .prompt-row {
+    display: flex; flex-direction: column; gap: 4px;
+    text-align: center;
+    margin-bottom: 14px;
+  }
+  .prompt-eyebrow {
+    font-size: 0.72rem; letter-spacing: 0.26em;
+    text-transform: uppercase; color: var(--copper);
+    font-style: italic;
+  }
+  .prompt-question {
+    font-family: var(--font-heading);
+    font-size: 1.9rem; font-weight: 500;
+    color: var(--navy);
+    letter-spacing: 0.01em;
+    line-height: 1.1;
+  }
+  .prompt-sub {
+    font-size: 0.85rem; color: var(--text-med);
+    font-style: italic;
+    margin-top: 2px;
+    min-height: 1.2em;
+  }
+
+  .input-row {
+    display: flex; gap: 8px; align-items: stretch;
+  }
+  input[type="text"] {
+    flex: 1;
+    background: var(--cream);
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-family: var(--font-body);
+    font-size: 1.05rem;
+    color: var(--text-dark);
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  input[type="text"]::placeholder { color: var(--text-light); font-style: italic; }
+  input[type="text"]:focus {
+    border-color: var(--copper);
+    box-shadow: 0 0 0 3px rgba(194,123,92,0.14);
+  }
+
+  button {
+    font-family: var(--font-body);
+    cursor: pointer;
+    font-size: 0.95rem;
+  }
+  button.primary {
+    background: var(--navy);
+    color: var(--cream);
+    border: 1px solid var(--navy);
+    border-radius: 8px;
+    padding: 0 18px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    transition: background 0.15s;
+  }
+  button.primary:hover { background: var(--navy-soft); }
+  button.icon {
+    background: var(--cream);
+    color: var(--text-med);
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    width: 44px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  button.icon:hover { color: var(--copper); border-color: var(--copper-light); }
+  button.icon.listening {
+    color: var(--cream); background: var(--copper);
+    border-color: var(--copper-dark);
+    animation: pulseMic 1.2s ease-in-out infinite;
+  }
+  @keyframes pulseMic {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(194,123,92,0.5); }
+    50% { box-shadow: 0 0 0 8px rgba(194,123,92,0); }
+  }
+
+  .feedback {
+    margin-top: 10px;
+    min-height: 22px;
+    text-align: center;
+    font-size: 0.95rem;
+    font-style: italic;
+    color: var(--text-med);
+    transition: color 0.2s;
+  }
+  .feedback.correct { color: var(--good); font-style: normal; }
+  .feedback.wrong { color: var(--bad); }
+  .feedback.reveal { color: var(--navy); font-weight: 600; font-style: normal; }
+
+  .tries {
+    margin-top: 8px;
+    display: flex; justify-content: center; align-items: center; gap: 10px;
+    font-size: 0.72rem; letter-spacing: 0.18em;
+    text-transform: uppercase; color: var(--text-light);
+  }
+  .tries .dots { display: inline-flex; gap: 5px; }
+  .tries .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--line-soft);
+    border: 1px solid var(--card-border);
+  }
+  .tries .dot.used { background: var(--copper); border-color: var(--copper-dark); }
+  .tries .hint-text { font-style: italic; letter-spacing: 0.08em; text-transform: none; font-size: 0.8rem; }
+
+  /* Tooltip */
+  .tooltip {
+    position: fixed; pointer-events: none;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    color: var(--navy);
+    font-family: var(--font-heading);
+    font-size: 1rem; font-weight: 500;
+    padding: 4px 10px; border-radius: 6px;
+    transform: translate(-50%, -130%);
+    opacity: 0; transition: opacity 0.1s;
+    white-space: nowrap;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+  }
+
+  /* Zoom controls */
+  .zoom {
+    position: fixed; bottom: 22px; right: 22px;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .zoom button {
+    width: 38px; height: 38px;
+    background: var(--card-bg); border: 1px solid var(--card-border);
+    color: var(--navy); border-radius: 8px;
+    font-size: 1.1rem; font-family: var(--font-heading);
+    cursor: pointer;
+  }
+  .zoom button:hover { border-color: var(--copper-light); color: var(--copper); }
+
+  /* Loader */
+  .loader {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--warm-gray);
+    color: var(--text-med);
+    font-family: var(--font-heading); font-style: italic; font-size: 1.2rem;
+    z-index: 50;
+  }
+
+  /* Overlay for welcome/victory */
+  .overlay {
+    position: fixed; inset: 0;
+    background: rgba(245,243,239,0.94);
+    display: none; align-items: center; justify-content: center;
+    z-index: 40;
+    backdrop-filter: blur(2px);
+  }
+  .overlay.show { display: flex; }
+  .overlay .card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 34px 42px;
+    max-width: 440px;
+    text-align: center;
+    box-shadow: 0 12px 40px rgba(30,58,95,0.14);
+  }
+  .overlay h2 {
+    font-family: var(--font-heading);
+    font-weight: 500;
+    font-size: 2.2rem;
+    color: var(--navy);
+    margin: 0 0 8px 0;
+  }
+  .overlay .flourish {
+    font-family: var(--font-heading); font-style: italic;
+    color: var(--copper); letter-spacing: 0.3em;
+    font-size: 0.75rem; text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+  .overlay p {
+    color: var(--text-med);
+    line-height: 1.5;
+    margin: 0 0 18px 0;
+    font-size: 0.95rem;
+  }
+  .overlay .kbd {
+    display: inline-block;
+    border: 1px solid var(--card-border);
+    background: var(--cream);
+    border-radius: 4px;
+    padding: 1px 8px;
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    color: var(--navy);
+    margin: 0 2px;
+  }
+
+  .mic-note {
+    font-size: 0.72rem; color: var(--text-light);
+    margin-top: 8px; text-align: center;
+    font-style: italic;
+  }
+
+  @media (max-width: 700px) {
+    .hud-title { max-width: 220px; padding: 10px 14px; }
+    .hud-title h1 { font-size: 1.3rem; }
+    .hud-title .subtitle { display: none; }
+    .hud-score { padding: 8px 12px; gap: 12px; }
+    .hud-score .value { font-size: 1.2rem; }
+    .hud-settings { top: 90px; padding: 8px 10px; }
+    .prompt-question { font-size: 1.4rem; }
+  }
+</style>
+</head>
+<body>
+
+<div id="mapWrap">
+  <svg id="map"></svg>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<header class="hud hud-title">
+  <h1>World Explorer</h1>
+  <div class="subtitle">A Cartographer's Quiz</div>
+</header>
+
+<section class="hud hud-score" aria-label="Score">
+  <div class="stat"><span class="label">Score</span><span class="value" id="score">0</span></div>
+  <div class="sep"></div>
+  <div class="stat"><span class="label">Streak</span><span class="value" id="streak">0</span></div>
+  <div class="sep"></div>
+  <div class="stat"><span class="label">Seen</span><span class="value" id="seen">0</span></div>
+  <div class="sep"></div>
+  <div class="stat"><span class="label">Best</span><span class="value" id="best">0</span></div>
+</section>
+
+<section class="hud hud-settings">
+  <label>
+    Region
+    <select id="regionSelect">
+      <option value="all">All regions</option>
+      <option>Africa</option>
+      <option>Americas</option>
+      <option>Asia</option>
+      <option>Europe</option>
+      <option>Oceania</option>
+    </select>
+  </label>
+</section>
+
+<section class="hud hud-prompt">
+  <div class="prompt-row">
+    <div class="prompt-eyebrow" id="promptEyebrow">Name this country</div>
+    <div class="prompt-question" id="promptQuestion">Loading…</div>
+    <div class="prompt-sub" id="promptSub"></div>
+  </div>
+  <div class="input-row">
+    <input type="text" id="answerInput" placeholder="Type your answer…" autocomplete="off" spellcheck="false" />
+    <button class="icon" id="micBtn" title="Answer by voice" aria-label="Answer by voice">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="9" y="2" width="6" height="12" rx="3"/>
+        <path d="M5 10v2a7 7 0 0 0 14 0v-2"/>
+        <line x1="12" y1="19" x2="12" y2="22"/>
+      </svg>
+    </button>
+    <button class="primary" id="submitBtn">Submit</button>
+  </div>
+  <div class="feedback" id="feedback">Press <span class="kbd" style="border:1px solid var(--card-border); padding:1px 6px; border-radius:4px; background:var(--cream); font-size:0.8em;">Space</span> to begin</div>
+  <div class="tries">
+    <span class="dots" id="triesDots">
+      <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+    </span>
+    <span>tries</span>
+    <span style="color:var(--line-soft)">·</span>
+    <span class="hint-text">Space to advance · Enter to submit</span>
+  </div>
+</section>
+
+<div class="zoom">
+  <button id="zoomIn" title="Zoom in">＋</button>
+  <button id="zoomOut" title="Zoom out">－</button>
+  <button id="zoomReset" title="Reset view">⟳</button>
+</div>
+
+<div class="loader" id="loader">Unfurling the world map…</div>
+
+<div class="overlay" id="welcome">
+  <div class="card">
+    <div class="flourish">— A Cartographer's Quiz —</div>
+    <h2>Welcome, Explorer</h2>
+    <p>A country will be highlighted on the map. Your task: <strong>name it</strong>. If you do, there's a bonus for naming its <strong>capital</strong> too. You have <strong>three tries</strong> before the answer is revealed.</p>
+    <p style="font-size:0.85rem;">Use <span class="kbd">Space</span> to advance to the next country, <span class="kbd">Enter</span> to submit, and click the <strong>🎤</strong> to answer by voice.</p>
+    <button class="primary" id="startBtn" style="padding:10px 24px; font-size:1rem;">Begin</button>
+  </div>
+</div>
+
+<div class="overlay" id="victory">
+  <div class="card">
+    <div class="flourish">— Round Complete —</div>
+    <h2 id="victoryHeadline">Well done, Explorer!</h2>
+    <p id="victoryStats"></p>
+    <button class="primary" id="playAgainBtn" style="padding:10px 24px; font-size:1rem;">Play again</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
+<script>
+/* =========================================================================
+   COUNTRY DATA — keyed by ISO 3166-1 numeric code (matches world-atlas ids)
+   ========================================================================= */
+const COUNTRIES = {
+  "004": { name: "Afghanistan", capital: "Kabul", region: "Asia" },
+  "008": { name: "Albania", capital: "Tirana", region: "Europe" },
+  "012": { name: "Algeria", capital: "Algiers", region: "Africa" },
+  "020": { name: "Andorra", capital: "Andorra la Vella", region: "Europe" },
+  "024": { name: "Angola", capital: "Luanda", region: "Africa" },
+  "028": { name: "Antigua and Barbuda", capital: "Saint John's", region: "Americas" },
+  "032": { name: "Argentina", capital: "Buenos Aires", region: "Americas" },
+  "051": { name: "Armenia", capital: "Yerevan", region: "Asia" },
+  "036": { name: "Australia", capital: "Canberra", region: "Oceania" },
+  "040": { name: "Austria", capital: "Vienna", region: "Europe" },
+  "031": { name: "Azerbaijan", capital: "Baku", region: "Asia" },
+  "044": { name: "Bahamas", capital: "Nassau", region: "Americas", alt: ["The Bahamas"] },
+  "048": { name: "Bahrain", capital: "Manama", region: "Asia" },
+  "050": { name: "Bangladesh", capital: "Dhaka", region: "Asia" },
+  "052": { name: "Barbados", capital: "Bridgetown", region: "Americas" },
+  "112": { name: "Belarus", capital: "Minsk", region: "Europe" },
+  "056": { name: "Belgium", capital: "Brussels", region: "Europe" },
+  "084": { name: "Belize", capital: "Belmopan", region: "Americas" },
+  "204": { name: "Benin", capital: "Porto-Novo", region: "Africa" },
+  "064": { name: "Bhutan", capital: "Thimphu", region: "Asia" },
+  "068": { name: "Bolivia", capital: "Sucre", region: "Americas", alt: ["La Paz"] },
+  "070": { name: "Bosnia and Herzegovina", capital: "Sarajevo", region: "Europe", alt: ["Bosnia"] },
+  "072": { name: "Botswana", capital: "Gaborone", region: "Africa" },
+  "076": { name: "Brazil", capital: "Brasília", region: "Americas", alt: ["Brasilia"] },
+  "096": { name: "Brunei", capital: "Bandar Seri Begawan", region: "Asia" },
+  "100": { name: "Bulgaria", capital: "Sofia", region: "Europe" },
+  "854": { name: "Burkina Faso", capital: "Ouagadougou", region: "Africa" },
+  "108": { name: "Burundi", capital: "Gitega", region: "Africa", alt: ["Bujumbura"] },
+  "132": { name: "Cabo Verde", capital: "Praia", region: "Africa", alt: ["Cape Verde"] },
+  "116": { name: "Cambodia", capital: "Phnom Penh", region: "Asia" },
+  "120": { name: "Cameroon", capital: "Yaoundé", region: "Africa", alt: ["Yaounde"] },
+  "124": { name: "Canada", capital: "Ottawa", region: "Americas" },
+  "140": { name: "Central African Republic", capital: "Bangui", region: "Africa", alt: ["CAR"] },
+  "148": { name: "Chad", capital: "N'Djamena", region: "Africa", alt: ["Ndjamena", "N Djamena"] },
+  "152": { name: "Chile", capital: "Santiago", region: "Americas" },
+  "156": { name: "China", capital: "Beijing", region: "Asia", alt: ["People's Republic of China", "PRC"] },
+  "170": { name: "Colombia", capital: "Bogotá", region: "Americas", alt: ["Bogota"] },
+  "174": { name: "Comoros", capital: "Moroni", region: "Africa" },
+  "178": { name: "Republic of the Congo", capital: "Brazzaville", region: "Africa", alt: ["Congo", "Congo Republic"] },
+  "180": { name: "Democratic Republic of the Congo", capital: "Kinshasa", region: "Africa", alt: ["DR Congo", "DRC", "Dem. Rep. Congo", "Zaire"] },
+  "188": { name: "Costa Rica", capital: "San José", region: "Americas", alt: ["San Jose"] },
+  "384": { name: "Côte d'Ivoire", capital: "Yamoussoukro", region: "Africa", alt: ["Ivory Coast", "Cote d'Ivoire"] },
+  "191": { name: "Croatia", capital: "Zagreb", region: "Europe" },
+  "192": { name: "Cuba", capital: "Havana", region: "Americas" },
+  "196": { name: "Cyprus", capital: "Nicosia", region: "Europe" },
+  "203": { name: "Czechia", capital: "Prague", region: "Europe", alt: ["Czech Republic"] },
+  "208": { name: "Denmark", capital: "Copenhagen", region: "Europe" },
+  "262": { name: "Djibouti", capital: "Djibouti", region: "Africa" },
+  "212": { name: "Dominica", capital: "Roseau", region: "Americas" },
+  "214": { name: "Dominican Republic", capital: "Santo Domingo", region: "Americas" },
+  "218": { name: "Ecuador", capital: "Quito", region: "Americas" },
+  "818": { name: "Egypt", capital: "Cairo", region: "Africa" },
+  "222": { name: "El Salvador", capital: "San Salvador", region: "Americas" },
+  "226": { name: "Equatorial Guinea", capital: "Malabo", region: "Africa" },
+  "232": { name: "Eritrea", capital: "Asmara", region: "Africa" },
+  "233": { name: "Estonia", capital: "Tallinn", region: "Europe" },
+  "748": { name: "Eswatini", capital: "Mbabane", region: "Africa", alt: ["Swaziland"] },
+  "231": { name: "Ethiopia", capital: "Addis Ababa", region: "Africa" },
+  "242": { name: "Fiji", capital: "Suva", region: "Oceania" },
+  "246": { name: "Finland", capital: "Helsinki", region: "Europe" },
+  "250": { name: "France", capital: "Paris", region: "Europe" },
+  "266": { name: "Gabon", capital: "Libreville", region: "Africa" },
+  "270": { name: "Gambia", capital: "Banjul", region: "Africa", alt: ["The Gambia"] },
+  "268": { name: "Georgia", capital: "Tbilisi", region: "Asia" },
+  "276": { name: "Germany", capital: "Berlin", region: "Europe" },
+  "288": { name: "Ghana", capital: "Accra", region: "Africa" },
+  "300": { name: "Greece", capital: "Athens", region: "Europe" },
+  "304": { name: "Greenland", capital: "Nuuk", region: "Americas" },
+  "308": { name: "Grenada", capital: "Saint George's", region: "Americas" },
+  "320": { name: "Guatemala", capital: "Guatemala City", region: "Americas" },
+  "324": { name: "Guinea", capital: "Conakry", region: "Africa" },
+  "624": { name: "Guinea-Bissau", capital: "Bissau", region: "Africa" },
+  "328": { name: "Guyana", capital: "Georgetown", region: "Americas" },
+  "332": { name: "Haiti", capital: "Port-au-Prince", region: "Americas" },
+  "340": { name: "Honduras", capital: "Tegucigalpa", region: "Americas" },
+  "348": { name: "Hungary", capital: "Budapest", region: "Europe" },
+  "352": { name: "Iceland", capital: "Reykjavík", region: "Europe", alt: ["Reykjavik"] },
+  "356": { name: "India", capital: "New Delhi", region: "Asia", alt: ["Delhi"] },
+  "360": { name: "Indonesia", capital: "Jakarta", region: "Asia", alt: ["Nusantara"] },
+  "364": { name: "Iran", capital: "Tehran", region: "Asia", alt: ["Persia"] },
+  "368": { name: "Iraq", capital: "Baghdad", region: "Asia" },
+  "372": { name: "Ireland", capital: "Dublin", region: "Europe" },
+  "376": { name: "Israel", capital: "Jerusalem", region: "Asia", alt: ["Tel Aviv"] },
+  "380": { name: "Italy", capital: "Rome", region: "Europe" },
+  "388": { name: "Jamaica", capital: "Kingston", region: "Americas" },
+  "392": { name: "Japan", capital: "Tokyo", region: "Asia" },
+  "400": { name: "Jordan", capital: "Amman", region: "Asia" },
+  "398": { name: "Kazakhstan", capital: "Astana", region: "Asia", alt: ["Nur-Sultan"] },
+  "404": { name: "Kenya", capital: "Nairobi", region: "Africa" },
+  "296": { name: "Kiribati", capital: "Tarawa", region: "Oceania", alt: ["South Tarawa"] },
+  "408": { name: "North Korea", capital: "Pyongyang", region: "Asia", alt: ["Dem. Rep. Korea", "DPRK"] },
+  "410": { name: "South Korea", capital: "Seoul", region: "Asia", alt: ["Korea"] },
+  "414": { name: "Kuwait", capital: "Kuwait City", region: "Asia" },
+  "417": { name: "Kyrgyzstan", capital: "Bishkek", region: "Asia" },
+  "418": { name: "Laos", capital: "Vientiane", region: "Asia" },
+  "428": { name: "Latvia", capital: "Riga", region: "Europe" },
+  "422": { name: "Lebanon", capital: "Beirut", region: "Asia" },
+  "426": { name: "Lesotho", capital: "Maseru", region: "Africa" },
+  "430": { name: "Liberia", capital: "Monrovia", region: "Africa" },
+  "434": { name: "Libya", capital: "Tripoli", region: "Africa" },
+  "438": { name: "Liechtenstein", capital: "Vaduz", region: "Europe" },
+  "440": { name: "Lithuania", capital: "Vilnius", region: "Europe" },
+  "442": { name: "Luxembourg", capital: "Luxembourg", region: "Europe", alt: ["Luxembourg City"] },
+  "450": { name: "Madagascar", capital: "Antananarivo", region: "Africa" },
+  "454": { name: "Malawi", capital: "Lilongwe", region: "Africa" },
+  "458": { name: "Malaysia", capital: "Kuala Lumpur", region: "Asia", alt: ["Putrajaya"] },
+  "462": { name: "Maldives", capital: "Malé", region: "Asia", alt: ["Male"] },
+  "466": { name: "Mali", capital: "Bamako", region: "Africa" },
+  "470": { name: "Malta", capital: "Valletta", region: "Europe" },
+  "584": { name: "Marshall Islands", capital: "Majuro", region: "Oceania" },
+  "478": { name: "Mauritania", capital: "Nouakchott", region: "Africa" },
+  "480": { name: "Mauritius", capital: "Port Louis", region: "Africa" },
+  "484": { name: "Mexico", capital: "Mexico City", region: "Americas" },
+  "583": { name: "Micronesia", capital: "Palikir", region: "Oceania", alt: ["Federated States of Micronesia"] },
+  "498": { name: "Moldova", capital: "Chișinău", region: "Europe", alt: ["Chisinau", "Kishinev"] },
+  "492": { name: "Monaco", capital: "Monaco", region: "Europe" },
+  "496": { name: "Mongolia", capital: "Ulaanbaatar", region: "Asia", alt: ["Ulan Bator"] },
+  "499": { name: "Montenegro", capital: "Podgorica", region: "Europe" },
+  "504": { name: "Morocco", capital: "Rabat", region: "Africa" },
+  "508": { name: "Mozambique", capital: "Maputo", region: "Africa" },
+  "104": { name: "Myanmar", capital: "Naypyidaw", region: "Asia", alt: ["Nay Pyi Taw", "Burma", "Rangoon", "Yangon"] },
+  "516": { name: "Namibia", capital: "Windhoek", region: "Africa" },
+  "520": { name: "Nauru", capital: "Yaren", region: "Oceania" },
+  "524": { name: "Nepal", capital: "Kathmandu", region: "Asia" },
+  "528": { name: "Netherlands", capital: "Amsterdam", region: "Europe", alt: ["The Hague", "Holland"] },
+  "554": { name: "New Zealand", capital: "Wellington", region: "Oceania" },
+  "558": { name: "Nicaragua", capital: "Managua", region: "Americas" },
+  "562": { name: "Niger", capital: "Niamey", region: "Africa" },
+  "566": { name: "Nigeria", capital: "Abuja", region: "Africa" },
+  "807": { name: "North Macedonia", capital: "Skopje", region: "Europe", alt: ["Macedonia"] },
+  "578": { name: "Norway", capital: "Oslo", region: "Europe" },
+  "512": { name: "Oman", capital: "Muscat", region: "Asia" },
+  "586": { name: "Pakistan", capital: "Islamabad", region: "Asia" },
+  "585": { name: "Palau", capital: "Ngerulmud", region: "Oceania" },
+  "275": { name: "Palestine", capital: "Ramallah", region: "Asia", alt: ["East Jerusalem", "State of Palestine"] },
+  "591": { name: "Panama", capital: "Panama City", region: "Americas" },
+  "598": { name: "Papua New Guinea", capital: "Port Moresby", region: "Oceania", alt: ["PNG"] },
+  "600": { name: "Paraguay", capital: "Asunción", region: "Americas", alt: ["Asuncion"] },
+  "604": { name: "Peru", capital: "Lima", region: "Americas" },
+  "608": { name: "Philippines", capital: "Manila", region: "Asia", alt: ["The Philippines"] },
+  "616": { name: "Poland", capital: "Warsaw", region: "Europe" },
+  "620": { name: "Portugal", capital: "Lisbon", region: "Europe" },
+  "634": { name: "Qatar", capital: "Doha", region: "Asia" },
+  "642": { name: "Romania", capital: "Bucharest", region: "Europe" },
+  "643": { name: "Russia", capital: "Moscow", region: "Europe", alt: ["Russian Federation"] },
+  "646": { name: "Rwanda", capital: "Kigali", region: "Africa" },
+  "659": { name: "Saint Kitts and Nevis", capital: "Basseterre", region: "Americas", alt: ["St. Kitts and Nevis", "St Kitts"] },
+  "662": { name: "Saint Lucia", capital: "Castries", region: "Americas", alt: ["St. Lucia", "St Lucia"] },
+  "670": { name: "Saint Vincent and the Grenadines", capital: "Kingstown", region: "Americas", alt: ["St. Vincent and the Grenadines", "St Vincent"] },
+  "882": { name: "Samoa", capital: "Apia", region: "Oceania" },
+  "674": { name: "San Marino", capital: "San Marino", region: "Europe" },
+  "678": { name: "São Tomé and Príncipe", capital: "São Tomé", region: "Africa", alt: ["Sao Tome and Principe", "Sao Tome"] },
+  "682": { name: "Saudi Arabia", capital: "Riyadh", region: "Asia" },
+  "686": { name: "Senegal", capital: "Dakar", region: "Africa" },
+  "688": { name: "Serbia", capital: "Belgrade", region: "Europe" },
+  "690": { name: "Seychelles", capital: "Victoria", region: "Africa" },
+  "694": { name: "Sierra Leone", capital: "Freetown", region: "Africa" },
+  "702": { name: "Singapore", capital: "Singapore", region: "Asia" },
+  "703": { name: "Slovakia", capital: "Bratislava", region: "Europe" },
+  "705": { name: "Slovenia", capital: "Ljubljana", region: "Europe" },
+  "090": { name: "Solomon Islands", capital: "Honiara", region: "Oceania" },
+  "706": { name: "Somalia", capital: "Mogadishu", region: "Africa" },
+  "710": { name: "South Africa", capital: "Pretoria", region: "Africa", alt: ["Cape Town", "Bloemfontein"] },
+  "728": { name: "South Sudan", capital: "Juba", region: "Africa" },
+  "724": { name: "Spain", capital: "Madrid", region: "Europe" },
+  "144": { name: "Sri Lanka", capital: "Colombo", region: "Asia", alt: ["Sri Jayawardenepura Kotte", "Ceylon"] },
+  "729": { name: "Sudan", capital: "Khartoum", region: "Africa" },
+  "740": { name: "Suriname", capital: "Paramaribo", region: "Americas" },
+  "752": { name: "Sweden", capital: "Stockholm", region: "Europe" },
+  "756": { name: "Switzerland", capital: "Bern", region: "Europe", alt: ["Berne"] },
+  "760": { name: "Syria", capital: "Damascus", region: "Asia" },
+  "158": { name: "Taiwan", capital: "Taipei", region: "Asia", alt: ["Republic of China"] },
+  "762": { name: "Tajikistan", capital: "Dushanbe", region: "Asia" },
+  "834": { name: "Tanzania", capital: "Dodoma", region: "Africa", alt: ["Dar es Salaam"] },
+  "764": { name: "Thailand", capital: "Bangkok", region: "Asia" },
+  "626": { name: "Timor-Leste", capital: "Dili", region: "Asia", alt: ["East Timor"] },
+  "768": { name: "Togo", capital: "Lomé", region: "Africa", alt: ["Lome"] },
+  "776": { name: "Tonga", capital: "Nuku'alofa", region: "Oceania", alt: ["Nukualofa"] },
+  "780": { name: "Trinidad and Tobago", capital: "Port of Spain", region: "Americas" },
+  "788": { name: "Tunisia", capital: "Tunis", region: "Africa" },
+  "792": { name: "Turkey", capital: "Ankara", region: "Asia", alt: ["Türkiye", "Turkiye"] },
+  "795": { name: "Turkmenistan", capital: "Ashgabat", region: "Asia" },
+  "798": { name: "Tuvalu", capital: "Funafuti", region: "Oceania" },
+  "800": { name: "Uganda", capital: "Kampala", region: "Africa" },
+  "804": { name: "Ukraine", capital: "Kyiv", region: "Europe", alt: ["Kiev"] },
+  "784": { name: "United Arab Emirates", capital: "Abu Dhabi", region: "Asia", alt: ["UAE", "Emirates"] },
+  "826": { name: "United Kingdom", capital: "London", region: "Europe", alt: ["UK", "Britain", "Great Britain", "England"] },
+  "840": { name: "United States", capital: "Washington, D.C.", region: "Americas", alt: ["USA", "US", "United States of America", "America", "Washington DC", "Washington"] },
+  "858": { name: "Uruguay", capital: "Montevideo", region: "Americas" },
+  "860": { name: "Uzbekistan", capital: "Tashkent", region: "Asia" },
+  "548": { name: "Vanuatu", capital: "Port Vila", region: "Oceania" },
+  "336": { name: "Vatican City", capital: "Vatican City", region: "Europe", alt: ["Holy See"] },
+  "862": { name: "Venezuela", capital: "Caracas", region: "Americas" },
+  "704": { name: "Vietnam", capital: "Hanoi", region: "Asia", alt: ["Viet Nam"] },
+  "540": { name: "New Caledonia", capital: "Nouméa", region: "Oceania", alt: ["Noumea"] },
+  "887": { name: "Yemen", capital: "Sana'a", region: "Asia", alt: ["Sanaa"] },
+  "894": { name: "Zambia", capital: "Lusaka", region: "Africa" },
+  "716": { name: "Zimbabwe", capital: "Harare", region: "Africa" }
+};
+
+/* =========================================================================
+   STATE
+   ========================================================================= */
+const STAGE = { IDLE: "idle", COUNTRY: "country", CAPITAL: "capital", RESOLVED: "resolved" };
+let state = {
+  topo: null,
+  features: [],
+  pool: [],                 // ids eligible this round
+  answered: new Set(),      // ids finished
+  currentId: null,
+  stage: STAGE.IDLE,
+  tries: 0,                 // wrong attempts on current sub-question
+  countryPoints: 0,         // points earned for country (carried into capital stage)
+  score: 0,
+  streak: 0,
+  best: 0,
+  regionFilter: "all",
+  recognition: null,
+  listening: false,
+};
+try { state.best = Number(localStorage.getItem("we_best") || 0) || 0; } catch(e) { state.best = 0; }
+
+/* =========================================================================
+   DOM
+   ========================================================================= */
+const $ = (id) => document.getElementById(id);
+const svg = d3.select("#map");
+const tooltip = $("tooltip");
+
+/* =========================================================================
+   MAP
+   ========================================================================= */
+let projection, pathGen, gMap, gGrat, zoomBehavior;
+
+function setupMap() {
+  const rect = svg.node().getBoundingClientRect();
+  const w = rect.width, h = rect.height;
+  projection = d3.geoNaturalEarth1()
+    .scale(w / 6.1)
+    .translate([w / 2, h / 2]);
+  pathGen = d3.geoPath(projection);
+
+  svg.selectAll("*").remove();
+  const root = svg.append("g").attr("class", "root");
+
+  // Graticule + sphere
+  gGrat = root.append("g").attr("class", "grat-layer");
+  const graticule = d3.geoGraticule().step([20, 20]);
+  gGrat.append("path").datum(graticule).attr("class", "graticule").attr("d", pathGen);
+  gGrat.append("path").datum({ type: "Sphere" }).attr("class", "sphere").attr("d", pathGen);
+  // Equator — dashed
+  const equator = { type: "LineString", coordinates: [[-180, 0], [-90, 0], [0, 0], [90, 0], [180, 0]] };
+  gGrat.append("path").datum(equator).attr("class", "equator").attr("d", pathGen);
+
+  // Countries
+  gMap = root.append("g").attr("class", "countries");
+
+  // Zoom / pan
+  zoomBehavior = d3.zoom()
+    .scaleExtent([1, 10])
+    .on("zoom", (ev) => root.attr("transform", ev.transform));
+  svg.call(zoomBehavior);
+}
+
+function renderCountries() {
+  const sel = gMap.selectAll("path.country").data(state.features, d => d.id);
+  sel.enter().append("path")
+    .attr("class", "country")
+    .attr("d", pathGen)
+    .on("mousemove", (ev, d) => {
+      // Hide tooltip for the active target country to avoid spoiling
+      if (d.id === state.currentId && (state.stage === STAGE.COUNTRY)) { tooltip.style.opacity = 0; return; }
+      const meta = COUNTRIES[d.id];
+      if (!meta) return;
+      tooltip.textContent = meta.name;
+      tooltip.style.left = ev.clientX + "px";
+      tooltip.style.top = ev.clientY + "px";
+      tooltip.style.opacity = 1;
+      d3.select(ev.currentTarget).classed("hover", true);
+    })
+    .on("mouseleave", (ev) => {
+      tooltip.style.opacity = 0;
+      d3.select(ev.currentTarget).classed("hover", false);
+    });
+}
+
+function clearClasses() {
+  gMap.selectAll("path.country")
+    .classed("target", false)
+    .classed("correct", false)
+    .classed("wrong-flash", false)
+    .classed("revealed", false);
+}
+
+function highlightTarget(id) {
+  gMap.selectAll("path.country").filter(d => d.id === id).classed("target", true);
+}
+
+function centerOn(id) {
+  const feat = state.features.find(f => f.id === id);
+  if (!feat) return;
+  // Do not zoom — that would make very small countries disappear. Just keep the view.
+  // (Could optionally pan gently; skipped to preserve user's current zoom.)
+}
+
+/* =========================================================================
+   ANSWER MATCHING
+   ========================================================================= */
+function normalize(s) {
+  return (s || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[.,'’`\-()]/g, " ")
+    .replace(/\bthe\b/g, "")
+    .replace(/\band\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function levenshtein(a, b) {
+  if (a === b) return 0;
+  const al = a.length, bl = b.length;
+  if (al === 0) return bl;
+  if (bl === 0) return al;
+  const dp = Array.from({ length: al + 1 }, () => new Array(bl + 1).fill(0));
+  for (let i = 0; i <= al; i++) dp[i][0] = i;
+  for (let j = 0; j <= bl; j++) dp[0][j] = j;
+  for (let i = 1; i <= al; i++) {
+    for (let j = 1; j <= bl; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost);
+    }
+  }
+  return dp[al][bl];
+}
+
+function matchAny(input, candidates) {
+  const u = normalize(input);
+  if (!u) return false;
+  const cands = candidates.map(normalize);
+  if (cands.includes(u)) return true;
+  // Allow 1 edit for 5+ char candidates, 2 edits for 9+
+  return cands.some(c => {
+    if (c.length >= 9) return levenshtein(u, c) <= 2;
+    if (c.length >= 5) return levenshtein(u, c) <= 1;
+    return false;
+  });
+}
+
+function matchesCountry(input, meta) {
+  return matchAny(input, [meta.name, ...(meta.alt || [])]);
+}
+function matchesCapital(input, meta) {
+  const caps = [meta.capital];
+  // Some alt entries are alternate capitals (e.g., La Paz for Bolivia)
+  if (meta.alt) meta.alt.forEach(a => { if (a) caps.push(a); });
+  return matchAny(input, caps);
+}
+
+/* =========================================================================
+   GAME FLOW
+   ========================================================================= */
+function pickNext() {
+  const remaining = state.pool.filter(id => !state.answered.has(id));
+  if (remaining.length === 0) { showVictory(); return; }
+  const id = remaining[Math.floor(Math.random() * remaining.length)];
+  state.currentId = id;
+  state.stage = STAGE.COUNTRY;
+  state.tries = 0;
+  state.countryPoints = 0;
+  clearClasses();
+  highlightTarget(id);
+  updateTriesDots();
+  $("feedback").className = "feedback";
+  $("feedback").textContent = "";
+  $("promptEyebrow").textContent = "Name this country";
+  $("promptQuestion").textContent = "What country is highlighted?";
+  $("promptSub").textContent = "";
+  $("answerInput").value = "";
+  $("answerInput").placeholder = "Type the country…";
+  $("answerInput").disabled = false;
+  $("submitBtn").disabled = false;
+  $("submitBtn").textContent = "Submit";
+  updateProgress();
+  setTimeout(() => $("answerInput").focus(), 40);
+}
+
+function updateTriesDots() {
+  const dots = $("triesDots").children;
+  for (let i = 0; i < dots.length; i++) {
+    dots[i].classList.toggle("used", i < state.tries);
+  }
+}
+
+function pointsForTries(tries) {
+  // tries = number of wrong attempts already made; 0 means first try
+  return [10, 7, 4][Math.min(tries, 2)] || 0;
+}
+function bonusForTries(tries) {
+  return [5, 3, 1][Math.min(tries, 2)] || 0;
+}
+
+function submitAnswer() {
+  const input = $("answerInput").value;
+  if (!input.trim()) return;
+  const meta = COUNTRIES[state.currentId];
+  if (!meta) return;
+
+  if (state.stage === STAGE.COUNTRY) {
+    if (matchesCountry(input, meta)) {
+      const pts = pointsForTries(state.tries);
+      state.countryPoints = pts;
+      state.score += pts;
+      if (state.tries === 0) state.streak += 1; else state.streak = 0;
+      if (state.streak > state.best) {
+        state.best = state.streak;
+        try { localStorage.setItem("we_best", String(state.best)); } catch(e) {}
+      }
+      gMap.selectAll("path.country").filter(d => d.id === state.currentId)
+        .classed("target", false).classed("correct", true);
+      showFeedback("correct", `✓ ${meta.name}. +${pts}`);
+      updateStats();
+      beginCapitalStage(meta);
+    } else {
+      state.tries += 1;
+      updateTriesDots();
+      flashWrongInput();
+      if (state.tries >= 3) {
+        revealCountry(meta);
+      } else {
+        state.streak = 0;
+        showFeedback("wrong", `Not quite. ${3 - state.tries} tr${3 - state.tries === 1 ? "y" : "ies"} left.`);
+        updateStats();
+      }
+    }
+  } else if (state.stage === STAGE.CAPITAL) {
+    if (matchesCapital(input, meta)) {
+      const bonus = bonusForTries(state.tries);
+      state.score += bonus;
+      showFeedback("correct", `✓ ${meta.capital}. Bonus +${bonus}`);
+      updateStats();
+      resolveCurrent(true);
+    } else {
+      state.tries += 1;
+      updateTriesDots();
+      flashWrongInput();
+      if (state.tries >= 3) {
+        revealCapital(meta);
+      } else {
+        showFeedback("wrong", `Not the capital. ${3 - state.tries} tr${3 - state.tries === 1 ? "y" : "ies"} left.`);
+      }
+    }
+  }
+}
+
+function beginCapitalStage(meta) {
+  state.stage = STAGE.CAPITAL;
+  state.tries = 0;
+  updateTriesDots();
+  $("promptEyebrow").textContent = "Bonus — Name the capital";
+  $("promptQuestion").textContent = `Capital of ${meta.name}?`;
+  $("promptSub").textContent = "Or press Space to skip to the next country";
+  $("answerInput").value = "";
+  $("answerInput").placeholder = "Type the capital…";
+  setTimeout(() => $("answerInput").focus(), 40);
+}
+
+function revealCountry(meta) {
+  state.stage = STAGE.RESOLVED;
+  state.streak = 0;
+  gMap.selectAll("path.country").filter(d => d.id === state.currentId)
+    .classed("target", false).classed("revealed", true);
+  showFeedback("reveal", `The answer was ${meta.name}. Its capital is ${meta.capital}.`);
+  $("promptSub").textContent = "Press Space for the next country";
+  $("answerInput").disabled = true;
+  $("submitBtn").disabled = true;
+  state.answered.add(state.currentId);
+  updateStats();
+  updateProgress();
+}
+
+function revealCapital(meta) {
+  showFeedback("reveal", `The capital is ${meta.capital}.`);
+  $("promptSub").textContent = "Press Space for the next country";
+  resolveCurrent(false);
+}
+
+function resolveCurrent(capitalGot) {
+  state.stage = STAGE.RESOLVED;
+  $("answerInput").disabled = true;
+  $("submitBtn").disabled = true;
+  state.answered.add(state.currentId);
+  updateProgress();
+  $("promptSub").textContent = "Press Space for the next country";
+}
+
+function advance() {
+  if (state.stage === STAGE.CAPITAL) {
+    // User skipped capital bonus
+    const meta = COUNTRIES[state.currentId];
+    showFeedback("", `Skipped — capital is ${meta.capital}.`);
+    resolveCurrent(false);
+    return;
+  }
+  if (state.stage === STAGE.RESOLVED) {
+    pickNext();
+  } else if (state.stage === STAGE.IDLE) {
+    pickNext();
+  }
+}
+
+function flashWrongInput() {
+  const inp = $("answerInput");
+  inp.style.borderColor = "var(--bad)";
+  inp.style.boxShadow = "0 0 0 3px rgba(184,95,79,0.15)";
+  setTimeout(() => {
+    inp.style.borderColor = "";
+    inp.style.boxShadow = "";
+    inp.select();
+  }, 250);
+}
+
+function showFeedback(kind, text) {
+  const el = $("feedback");
+  el.className = "feedback " + (kind || "");
+  el.textContent = text;
+}
+
+function updateStats() {
+  $("score").textContent = state.score;
+  $("streak").textContent = state.streak;
+  $("seen").textContent = state.answered.size;
+  $("best").textContent = state.best;
+}
+
+function updateProgress() {
+  $("seen").textContent = state.answered.size;
+}
+
+/* =========================================================================
+   REGION / POOL
+   ========================================================================= */
+function rebuildPool() {
+  const available = state.features
+    .map(f => String(f.id).padStart(3, "0"))
+    .filter(id => COUNTRIES[id]);
+  state.pool = state.regionFilter === "all"
+    ? available
+    : available.filter(id => COUNTRIES[id].region === state.regionFilter);
+}
+
+function resetRound() {
+  state.answered = new Set();
+  state.score = 0;
+  state.streak = 0;
+  state.stage = STAGE.IDLE;
+  state.tries = 0;
+  state.currentId = null;
+  clearClasses();
+  $("welcome").classList.remove("show");
+  $("victory").classList.remove("show");
+  rebuildPool();
+  updateStats();
+  updateProgress();
+  pickNext();
+}
+
+/* =========================================================================
+   VICTORY
+   ========================================================================= */
+function showVictory() {
+  $("victory").classList.add("show");
+  $("victoryStats").innerHTML =
+    `You finished with a score of <strong>${state.score}</strong> across <strong>${state.answered.size}</strong> countries. Best streak: <strong>${state.best}</strong>.`;
+}
+
+/* =========================================================================
+   VOICE (Web Speech API)
+   ========================================================================= */
+function initSpeech() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    $("micBtn").style.display = "none";
+    return;
+  }
+  const rec = new SR();
+  rec.lang = "en-US";
+  rec.interimResults = true;
+  rec.continuous = false;
+  rec.maxAlternatives = 3;
+
+  rec.onresult = (ev) => {
+    let transcript = "";
+    for (let i = ev.resultIndex; i < ev.results.length; i++) {
+      transcript += ev.results[i][0].transcript;
+    }
+    $("answerInput").value = transcript.trim();
+    if (ev.results[ev.results.length - 1].isFinal) {
+      rec.stop();
+      // Auto-submit on final voice result
+      setTimeout(submitAnswer, 80);
+    }
+  };
+  rec.onend = () => {
+    state.listening = false;
+    $("micBtn").classList.remove("listening");
+  };
+  rec.onerror = (ev) => {
+    state.listening = false;
+    $("micBtn").classList.remove("listening");
+    if (ev.error === "not-allowed" || ev.error === "service-not-allowed") {
+      showFeedback("wrong", "Microphone permission blocked. Click the mic again or allow access.");
+    }
+  };
+  state.recognition = rec;
+}
+
+function toggleMic() {
+  if (!state.recognition) return;
+  if (state.listening) {
+    state.recognition.stop();
+    return;
+  }
+  try {
+    state.recognition.start();
+    state.listening = true;
+    $("micBtn").classList.add("listening");
+    $("answerInput").value = "";
+    $("answerInput").placeholder = "Listening…";
+  } catch (e) {
+    // Sometimes start() throws if already started; ignore
+  }
+}
+
+/* =========================================================================
+   EVENTS
+   ========================================================================= */
+function wire() {
+  $("submitBtn").addEventListener("click", submitAnswer);
+  $("micBtn").addEventListener("click", toggleMic);
+  $("regionSelect").addEventListener("change", (e) => {
+    state.regionFilter = e.target.value;
+    resetRound();
+  });
+  $("startBtn").addEventListener("click", () => { $("welcome").classList.remove("show"); pickNext(); });
+  $("playAgainBtn").addEventListener("click", resetRound);
+  $("zoomIn").addEventListener("click", () => svg.transition().call(zoomBehavior.scaleBy, 1.5));
+  $("zoomOut").addEventListener("click", () => svg.transition().call(zoomBehavior.scaleBy, 1/1.5));
+  $("zoomReset").addEventListener("click", () => svg.transition().call(zoomBehavior.transform, d3.zoomIdentity));
+
+  $("answerInput").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); submitAnswer(); }
+  });
+
+  document.addEventListener("keydown", (e) => {
+    // Space advances unless typing in the input (space is allowed mid-word)
+    if (e.code !== "Space" && e.key !== " ") return;
+    const activeIsInput = document.activeElement === $("answerInput");
+    // If the input is disabled (RESOLVED) OR we're in CAPITAL stage with empty input, space advances.
+    if (state.stage === STAGE.RESOLVED || state.stage === STAGE.IDLE) {
+      if (!$("welcome").classList.contains("show") || state.stage === STAGE.IDLE) {
+        // ignore if welcome overlay is showing; its own button handles start
+        if ($("welcome").classList.contains("show")) return;
+      }
+      e.preventDefault();
+      advance();
+      return;
+    }
+    if (state.stage === STAGE.CAPITAL && activeIsInput && $("answerInput").value.trim() === "") {
+      // Pressing space with empty input skips the capital bonus
+      e.preventDefault();
+      advance();
+      return;
+    }
+    if (state.stage === STAGE.CAPITAL && !activeIsInput) {
+      e.preventDefault();
+      advance();
+      return;
+    }
+    // Otherwise allow space to be typed
+  });
+
+  window.addEventListener("resize", () => {
+    setupMap();
+    renderCountries();
+    // Re-apply the current target highlight
+    if (state.currentId && state.stage === STAGE.COUNTRY) highlightTarget(state.currentId);
+    if (state.stage === STAGE.CAPITAL || state.stage === STAGE.RESOLVED) {
+      gMap.selectAll("path.country").filter(d => d.id === state.currentId)
+        .classed(state.stage === STAGE.RESOLVED ? "revealed" : "correct", true);
+    }
+  });
+}
+
+/* =========================================================================
+   LOAD
+   ========================================================================= */
+async function load() {
+  const urls = [
+    "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json",
+    "https://unpkg.com/world-atlas@2/countries-110m.json"
+  ];
+  let topo = null;
+  for (const url of urls) {
+    try {
+      const r = await fetch(url);
+      if (r.ok) { topo = await r.json(); break; }
+    } catch(e) {}
+  }
+  if (!topo) {
+    $("loader").textContent = "Could not load the world map. Please check your internet connection.";
+    return;
+  }
+  state.topo = topo;
+  const geo = topojson.feature(topo, topo.objects.countries);
+  state.features = geo.features.map(f => ({ ...f, id: String(f.id).padStart(3, "0") }));
+  $("loader").style.display = "none";
+  setupMap();
+  renderCountries();
+  rebuildPool();
+  initSpeech();
+  wire();
+  updateStats();
+  $("welcome").classList.add("show");
+}
+
+load();
+</script>
+</body>
+</html>
