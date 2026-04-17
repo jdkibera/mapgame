@@ -1699,10 +1699,23 @@ function setPlayerName(raw) {
   applyPlayerName();
 }
 function applyPlayerName() {
+  const multi = state && state.mode === "multi" && state.players && state.players.length > 1;
   const name = getPlayerName();
-  document.title = `${name} the Explorer — A Map Game`;
+  const titleText = multi
+    ? "The Explorers"
+    : `${name} the Explorer`;
+  document.title = multi
+    ? `${state.players.map(p => p.name).join(" · ")} — A Map Game`
+    : `${name} the Explorer — A Map Game`;
   const h1 = document.querySelector(".hud-title h1");
-  if (h1) h1.textContent = `${name} the Explorer`;
+  if (h1) h1.textContent = titleText;
+  // On the title card, when in multi, replace the subtitle with the player list.
+  const subtitle = document.querySelector(".hud-title .subtitle");
+  if (subtitle) {
+    subtitle.textContent = multi
+      ? state.players.map(p => p.name).join(" · ")
+      : "A Cartographer's Quiz";
+  }
   const welcomeH2 = document.getElementById("welcomeGreeting");
   if (welcomeH2) welcomeH2.textContent = `Welcome, ${name}`;
 }
@@ -2382,11 +2395,17 @@ function pickNext() {
   updateSuggestions();
   setTimeout(() => $("answerInput").focus(), 40);
   // Multi mode: announce whose turn it is before starting the mic, so the
-  // agent's voice isn't captured as the player's answer.
+  // agent's voice isn't captured as the player's answer. Skip on the very
+  // first question — the welcome greeting already names the first player.
   if (state.mode === "multi" && state.turnJustAdvanced) {
     state.turnJustAdvanced = false;
+    if (state.skipFirstTurnAnnounce) {
+      state.skipFirstTurnAnnounce = false;
+      maybeStartListeningForStage();
+      return;
+    }
     state.suppressListening = true;
-    setTimeout(() => { state.suppressListening = false; }, 2200); // fallback
+    setTimeout(() => { state.suppressListening = false; }, 2200);
     speakBritish(`${cur().name}, your turn.`, () => {
       state.suppressListening = false;
       maybeStartListeningForStage();
@@ -3242,8 +3261,13 @@ function wire() {
     state.currentPlayerIdx = state.players.length - 1; // first advancePlayer rolls to 0
     document.body.classList.toggle("multi-mode", state.mode === "multi");
     applyPlayerName();
+    // Skip the auto "Name, your turn" announcement for the VERY first
+    // question — the welcome greeting already names who goes first, and
+    // speakBritish()'s internal cancel() would otherwise cut it off.
+    state.skipFirstTurnAnnounce = true;
+    const firstUp = state.players[0].name;
     const greet = state.mode === "multi"
-      ? `Hello explorers — ${state.players.map(p => p.name).join(", ")}. Let's explore.`
+      ? `Hello explorers — ${state.players.map(p => p.name).join(", ")}. ${firstUp}, you're up first.`
       : `Hello ${state.players[0].name}, let's explore.`;
 
     // === iOS / Chrome-mobile gesture window ===
