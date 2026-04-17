@@ -6,7 +6,7 @@
 <title>World Explorer — A Map Game</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,300;1,8..60,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,300;1,8..60,400&family=IM+Fell+English+SC&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
 <style>
   :root {
     --copper: #C27B5C;
@@ -31,13 +31,16 @@
     --land-stroke: #D0C8BE;
     --graticule: #B8C6D4;
 
-    --good: #6E8B6E;       /* muted sage */
-    --good-soft: #D7E1D4;
-    --bad: #B85F4F;        /* muted terracotta */
-    --bad-soft: #EED6CF;
+    --good: #6E8B6E;
+    --good-soft: #C4D4BC;
+    --bad: #B85F4F;
+    --bad-soft: #E8C5BD;
+    --amber: #C79A5A;
+    --amber-soft: #EED7B8;
 
     --font-heading: 'Cormorant Garamond', Georgia, serif;
     --font-body: 'Source Serif 4', Georgia, serif;
+    --font-display: 'IM Fell English SC', 'Cormorant Garamond', Georgia, serif;
   }
 
   * { box-sizing: border-box; }
@@ -53,8 +56,7 @@
   /* Full-bleed map */
   #mapWrap {
     position: fixed; inset: 0;
-    background:
-      radial-gradient(ellipse at center, var(--ocean) 0%, var(--ocean-deep) 90%);
+    background: radial-gradient(ellipse at center, var(--ocean) 0%, var(--ocean-deep) 90%);
   }
   svg#map { width: 100%; height: 100%; display: block; }
 
@@ -62,15 +64,22 @@
     fill: var(--land);
     stroke: var(--land-stroke);
     stroke-width: 0.5;
-    transition: fill 0.2s ease, stroke 0.2s ease;
+    transition: fill 0.25s ease, stroke 0.25s ease;
   }
   .country.hover { fill: #D7CDBF; cursor: help; }
+
+  /* Persistent session history fills — override land */
+  .country.hist-correct { fill: var(--good-soft); stroke: #96AF90; }
+  .country.hist-partial { fill: var(--amber-soft); stroke: var(--amber); }
+  .country.hist-revealed { fill: var(--bad-soft); stroke: #B88276; }
+
+  /* Active target highlight — always wins */
   .country.target {
     fill: var(--copper);
     stroke: var(--copper-dark);
-    stroke-width: 1.1;
+    stroke-width: 1.2;
   }
-  .country.correct { fill: var(--good); stroke: #4A6348; }
+  .country.correct-flash { fill: var(--good); stroke: #4A6348; }
   .country.wrong-flash { fill: var(--bad); stroke: #8C3F32; }
   .country.revealed { fill: var(--navy); stroke: #0E2440; }
 
@@ -90,68 +99,90 @@
   .hud-title {
     top: 18px; left: 18px;
     padding: 14px 20px 12px 20px;
-    max-width: 360px;
+    max-width: 320px;
   }
   .hud-title h1 {
     margin: 0;
     font-family: var(--font-heading);
     font-weight: 500;
-    font-size: 1.75rem;
+    font-size: 1.7rem;
     color: var(--navy);
     letter-spacing: 0.02em;
   }
   .hud-title .subtitle {
     margin-top: 2px;
-    font-size: 0.78rem;
-    letter-spacing: 0.18em;
+    font-size: 0.72rem;
+    letter-spacing: 0.2em;
     text-transform: uppercase;
     color: var(--text-med);
     font-style: italic;
+  }
+  .hud-title .level-badge {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--line-soft);
+    display: flex; align-items: baseline; gap: 6px;
+  }
+  .hud-title .level-badge .lvl-num {
+    font-family: var(--font-display);
+    color: var(--copper);
+    font-size: 0.78rem;
+    letter-spacing: 0.15em;
+  }
+  .hud-title .level-badge .lvl-name {
+    font-family: var(--font-heading);
+    color: var(--navy);
+    font-size: 1.05rem;
+    font-weight: 500;
   }
 
   .hud-score {
     top: 18px; right: 18px;
     padding: 10px 16px;
-    display: flex; gap: 20px; align-items: baseline;
+    display: flex; gap: 18px; align-items: baseline;
     font-family: var(--font-heading);
   }
-  .hud-score .stat { display: flex; flex-direction: column; align-items: center; min-width: 54px; }
+  .hud-score .stat { display: flex; flex-direction: column; align-items: center; min-width: 52px; }
   .hud-score .label {
     font-family: var(--font-body);
-    font-size: 0.65rem; letter-spacing: 0.22em;
+    font-size: 0.63rem; letter-spacing: 0.22em;
     text-transform: uppercase; color: var(--text-light);
     font-style: italic;
   }
-  .hud-score .value { font-size: 1.5rem; font-weight: 500; color: var(--navy); font-variant-numeric: tabular-nums; }
+  .hud-score .value { font-size: 1.45rem; font-weight: 500; color: var(--navy); font-variant-numeric: tabular-nums; }
   .hud-score .sep { width: 1px; background: var(--line-soft); align-self: stretch; }
 
-  .hud-settings {
-    top: 110px; right: 18px;
-    padding: 10px 14px;
-    display: flex; flex-direction: column; gap: 8px;
-    font-size: 0.85rem;
+  .hud-toolbar {
+    top: 106px; right: 18px;
+    padding: 8px;
+    display: flex; gap: 6px; align-items: center;
   }
-  .hud-settings label {
-    display: flex; align-items: center; gap: 8px;
-    color: var(--text-med);
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    font-size: 0.7rem;
-  }
-  .hud-settings select {
+  .tbtn {
     background: var(--cream);
     border: 1px solid var(--card-border);
-    color: var(--text-dark);
-    padding: 5px 10px; border-radius: 6px;
-    font-family: var(--font-body); font-size: 0.9rem;
+    color: var(--navy);
+    font-family: var(--font-body);
+    font-size: 0.82rem;
+    padding: 7px 12px;
+    border-radius: 7px;
+    cursor: pointer;
+    display: inline-flex; align-items: center; gap: 6px;
+    transition: all 0.15s;
+  }
+  .tbtn:hover { border-color: var(--copper-light); color: var(--copper); }
+  .tbtn svg { width: 14px; height: 14px; }
+  .tbtn.danger:hover { color: var(--bad); border-color: var(--bad-soft); }
+  .tbtn select {
+    background: transparent; border: none; color: inherit;
+    font-family: inherit; font-size: inherit;
+    padding: 0; margin: 0; cursor: pointer;
     outline: none;
   }
-  .hud-settings select:focus { border-color: var(--copper); }
 
-  /* Prompt card — bottom center, travel journal style */
+  /* Prompt card */
   .hud-prompt {
     bottom: 22px; left: 50%; transform: translateX(-50%);
-    width: min(640px, calc(100vw - 36px));
+    width: min(660px, calc(100vw - 36px));
     padding: 20px 26px 18px 26px;
   }
   .prompt-row {
@@ -302,7 +333,7 @@
     z-index: 50;
   }
 
-  /* Overlay for welcome/victory */
+  /* Overlay cards */
   .overlay {
     position: fixed; inset: 0;
     background: rgba(245,243,239,0.94);
@@ -316,7 +347,7 @@
     border: 1px solid var(--card-border);
     border-radius: 12px;
     padding: 34px 42px;
-    max-width: 440px;
+    max-width: 480px;
     text-align: center;
     box-shadow: 0 12px 40px rgba(30,58,95,0.14);
   }
@@ -350,6 +381,190 @@
     color: var(--navy);
     margin: 0 2px;
   }
+  .secondary-link {
+    display: inline-block; margin-top: 14px;
+    color: var(--copper); font-style: italic;
+    text-decoration: none; font-size: 0.9rem;
+    border-bottom: 1px solid var(--copper-pale);
+    padding-bottom: 1px;
+    cursor: pointer;
+  }
+  .secondary-link:hover { color: var(--copper-dark); }
+
+  /* ============================================================
+     LEVEL-UP OVERLAY — zooms in from the horizon
+     ============================================================ */
+  .levelup {
+    position: fixed; inset: 0;
+    background: radial-gradient(ellipse at center, rgba(228,234,240,0.95) 0%, rgba(226,218,208,0.97) 70%, rgba(194,123,92,0.92) 100%);
+    display: none; align-items: center; justify-content: center;
+    z-index: 60;
+    perspective: 900px;
+  }
+  .levelup.show { display: flex; }
+  .levelup .stage {
+    text-align: center;
+    transform-style: preserve-3d;
+  }
+  .levelup .roman {
+    font-family: var(--font-display);
+    color: var(--copper);
+    font-size: 1rem;
+    letter-spacing: 0.7em;
+    text-transform: uppercase;
+    margin-bottom: 22px;
+    animation: fadeInDelayed 2.8s ease-out forwards;
+    opacity: 0;
+  }
+  .levelup .title {
+    font-family: var(--font-display);
+    color: var(--navy);
+    font-size: clamp(3rem, 9vw, 7rem);
+    font-weight: normal;
+    letter-spacing: 0.05em;
+    line-height: 1;
+    text-shadow: 0 2px 18px rgba(30,58,95,0.12);
+    animation: zoomFromHorizon 2.8s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+    transform-origin: center center;
+  }
+  .levelup .subtitle {
+    margin-top: 18px;
+    font-family: var(--font-heading);
+    font-style: italic;
+    color: var(--text-med);
+    font-size: clamp(1rem, 2vw, 1.4rem);
+    letter-spacing: 0.15em;
+    animation: fadeInDelayed 2.8s ease-out forwards;
+    animation-delay: 0.3s;
+    opacity: 0;
+  }
+  .levelup .ornament {
+    color: var(--copper);
+    font-size: 1.2rem;
+    margin: 28px 0 0 0;
+    letter-spacing: 1em;
+    animation: fadeInDelayed 2.8s ease-out forwards;
+    animation-delay: 0.4s;
+    opacity: 0;
+    font-family: var(--font-heading);
+  }
+  @keyframes zoomFromHorizon {
+    0%   { transform: translateZ(-800px) scale(0.05); opacity: 0; filter: blur(6px); letter-spacing: 2em; }
+    25%  { opacity: 1; filter: blur(1px); }
+    55%  { transform: translateZ(0) scale(1.08); opacity: 1; filter: blur(0); letter-spacing: 0.08em; }
+    70%  { transform: translateZ(0) scale(1); opacity: 1; letter-spacing: 0.05em; }
+    90%  { opacity: 1; }
+    100% { transform: translateZ(0) scale(1); opacity: 0; }
+  }
+  @keyframes fadeInDelayed {
+    0%, 35% { opacity: 0; transform: translateY(8px); }
+    55%, 85% { opacity: 1; transform: translateY(0); }
+    100% { opacity: 0; }
+  }
+
+  /* ============================================================
+     CONFETTI FLOURISH — a subtle sparkle burst on correct
+     (in addition to the canvas-confetti library)
+     ============================================================ */
+  @keyframes sparkle {
+    0% { transform: scale(0); opacity: 0; }
+    40% { transform: scale(1.2); opacity: 1; }
+    100% { transform: scale(1); opacity: 0; }
+  }
+
+  /* ============================================================
+     STUDY MODAL
+     ============================================================ */
+  .modal {
+    position: fixed; inset: 0;
+    background: rgba(245,243,239,0.94);
+    display: none; align-items: center; justify-content: center;
+    z-index: 55;
+    backdrop-filter: blur(2px);
+  }
+  .modal.show { display: flex; }
+  .modal-card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    width: min(860px, calc(100vw - 36px));
+    max-height: calc(100vh - 72px);
+    box-shadow: 0 12px 40px rgba(30,58,95,0.14);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .modal-head {
+    padding: 18px 24px;
+    border-bottom: 1px solid var(--line-soft);
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    flex-wrap: wrap;
+  }
+  .modal-head h3 {
+    margin: 0;
+    font-family: var(--font-heading);
+    font-weight: 500;
+    color: var(--navy);
+    font-size: 1.5rem;
+  }
+  .modal-head .sub {
+    color: var(--text-med); font-style: italic; font-size: 0.9rem;
+    letter-spacing: 0.08em;
+  }
+  .modal-head input[type="text"] {
+    min-width: 220px;
+    padding: 8px 12px;
+    font-size: 0.9rem;
+  }
+  .modal-close {
+    background: transparent; border: 1px solid var(--card-border);
+    padding: 6px 12px; border-radius: 6px; color: var(--navy);
+    cursor: pointer; font-family: var(--font-body); font-size: 0.85rem;
+  }
+  .modal-close:hover { border-color: var(--copper); color: var(--copper); }
+  .modal-body {
+    padding: 16px 24px 24px 24px;
+    overflow-y: auto;
+  }
+  .tier-section { margin-bottom: 22px; }
+  .tier-section h4 {
+    margin: 0 0 10px 0;
+    font-family: var(--font-display);
+    color: var(--copper);
+    font-size: 0.95rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--line-soft);
+    display: flex; align-items: baseline; gap: 12px;
+  }
+  .tier-section h4 .tname {
+    color: var(--navy); font-family: var(--font-heading);
+    text-transform: none; font-style: italic; letter-spacing: 0.04em;
+    font-size: 1rem;
+  }
+  .tier-section h4 .tcount {
+    margin-left: auto;
+    color: var(--text-light); font-size: 0.78rem;
+    letter-spacing: 0.12em;
+  }
+  .country-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 4px 14px;
+    font-size: 0.92rem;
+  }
+  .country-grid .row {
+    display: flex; justify-content: space-between; align-items: baseline;
+    gap: 10px; padding: 4px 0;
+    border-bottom: 1px dotted var(--line-soft);
+  }
+  .country-grid .row .cname {
+    color: var(--navy); font-weight: 500;
+  }
+  .country-grid .row .ccap {
+    color: var(--text-med); font-style: italic; font-size: 0.85rem;
+    text-align: right;
+  }
 
   .mic-note {
     font-size: 0.72rem; color: var(--text-light);
@@ -357,14 +572,14 @@
     font-style: italic;
   }
 
-  @media (max-width: 700px) {
+  @media (max-width: 760px) {
     .hud-title { max-width: 220px; padding: 10px 14px; }
-    .hud-title h1 { font-size: 1.3rem; }
+    .hud-title h1 { font-size: 1.25rem; }
     .hud-title .subtitle { display: none; }
     .hud-score { padding: 8px 12px; gap: 12px; }
-    .hud-score .value { font-size: 1.2rem; }
-    .hud-settings { top: 90px; padding: 8px 10px; }
-    .prompt-question { font-size: 1.4rem; }
+    .hud-score .value { font-size: 1.15rem; }
+    .hud-toolbar { top: 96px; padding: 6px; gap: 4px; flex-wrap: wrap; max-width: 220px; }
+    .prompt-question { font-size: 1.35rem; }
   }
 </style>
 </head>
@@ -379,6 +594,10 @@
 <header class="hud hud-title">
   <h1>World Explorer</h1>
   <div class="subtitle">A Cartographer's Quiz</div>
+  <div class="level-badge">
+    <span class="lvl-num" id="levelNum">Lv. I</span>
+    <span class="lvl-name" id="levelName">Home Waters</span>
+  </div>
 </header>
 
 <section class="hud hud-score" aria-label="Score">
@@ -386,23 +605,30 @@
   <div class="sep"></div>
   <div class="stat"><span class="label">Streak</span><span class="value" id="streak">0</span></div>
   <div class="sep"></div>
-  <div class="stat"><span class="label">Seen</span><span class="value" id="seen">0</span></div>
+  <div class="stat"><span class="label">Seen</span><span class="value" id="seen">0 / 0</span></div>
   <div class="sep"></div>
   <div class="stat"><span class="label">Best</span><span class="value" id="best">0</span></div>
 </section>
 
-<section class="hud hud-settings">
-  <label>
-    Region
-    <select id="regionSelect">
-      <option value="all">All regions</option>
-      <option>Africa</option>
-      <option>Americas</option>
-      <option>Asia</option>
-      <option>Europe</option>
-      <option>Oceania</option>
+<section class="hud hud-toolbar">
+  <button class="tbtn" id="studyBtn" title="Study mode — browse all countries & capitals">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+    Study
+  </button>
+  <button class="tbtn" id="jumpBtn" title="Jump to level">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15 8 22 9 17 14 18 21 12 18 6 21 7 14 2 9 9 8 12 2"/></svg>
+    <select id="levelSelect" title="Jump to level">
+      <option value="1">Lv I — Home Waters</option>
+      <option value="2">Lv II — Foreign Shores</option>
+      <option value="3">Lv III — Uncharted Seas</option>
+      <option value="4">Lv IV — Terra Incognita</option>
+      <option value="5">Lv V — Edge of the World</option>
     </select>
-  </label>
+  </button>
+  <button class="tbtn danger" id="resetBtn" title="Reset the entire game">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+    Reset
+  </button>
 </section>
 
 <section class="hud hud-prompt">
@@ -412,8 +638,9 @@
     <div class="prompt-sub" id="promptSub"></div>
   </div>
   <div class="input-row">
-    <input type="text" id="answerInput" placeholder="Type your answer…" autocomplete="off" spellcheck="false" />
-    <button class="icon" id="micBtn" title="Answer by voice" aria-label="Answer by voice">
+    <input type="text" id="answerInput" list="suggestions" placeholder="Type your answer…" autocomplete="off" spellcheck="false" />
+    <datalist id="suggestions"></datalist>
+    <button class="icon" id="micBtn" title="Voice mode (click to toggle)" aria-label="Voice mode">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <rect x="9" y="2" width="6" height="12" rx="3"/>
         <path d="M5 10v2a7 7 0 0 0 14 0v-2"/>
@@ -422,14 +649,14 @@
     </button>
     <button class="primary" id="submitBtn">Submit</button>
   </div>
-  <div class="feedback" id="feedback">Press <span class="kbd" style="border:1px solid var(--card-border); padding:1px 6px; border-radius:4px; background:var(--cream); font-size:0.8em;">Space</span> to begin</div>
+  <div class="feedback" id="feedback"></div>
   <div class="tries">
     <span class="dots" id="triesDots">
       <span class="dot"></span><span class="dot"></span><span class="dot"></span>
     </span>
     <span>tries</span>
     <span style="color:var(--line-soft)">·</span>
-    <span class="hint-text">Space to advance · Enter to submit</span>
+    <span class="hint-text"><span class="kbd">Space</span> advance · <span class="kbd">Enter</span> submit</span>
   </div>
 </section>
 
@@ -445,23 +672,48 @@
   <div class="card">
     <div class="flourish">— A Cartographer's Quiz —</div>
     <h2>Welcome, Explorer</h2>
-    <p>A country will be highlighted on the map. Your task: <strong>name it</strong>. If you do, there's a bonus for naming its <strong>capital</strong> too. You have <strong>three tries</strong> before the answer is revealed.</p>
-    <p style="font-size:0.85rem;">Use <span class="kbd">Space</span> to advance to the next country, <span class="kbd">Enter</span> to submit, and click the <strong>🎤</strong> to answer by voice.</p>
-    <button class="primary" id="startBtn" style="padding:10px 24px; font-size:1rem;">Begin</button>
+    <p>A country will be highlighted on the map. Name it — and for a bonus, name its capital. Three tries before it's revealed.</p>
+    <p style="font-size:0.85rem;">Progress through five levels, from <em>Home Waters</em> to the <em>Edge of the World</em>. Use <span class="kbd">Space</span> to advance, <span class="kbd">Enter</span> to submit, and the <strong>🎤</strong> to switch to voice mode (stays on).</p>
+    <button class="primary" id="startBtn" style="padding:10px 24px; font-size:1rem;">Begin Voyage</button>
+    <a class="secondary-link" id="studyFromWelcome">Browse all countries first →</a>
   </div>
 </div>
 
 <div class="overlay" id="victory">
   <div class="card">
-    <div class="flourish">— Round Complete —</div>
-    <h2 id="victoryHeadline">Well done, Explorer!</h2>
+    <div class="flourish">— Voyage Complete —</div>
+    <h2 id="victoryHeadline">A Master Cartographer!</h2>
     <p id="victoryStats"></p>
     <button class="primary" id="playAgainBtn" style="padding:10px 24px; font-size:1rem;">Play again</button>
   </div>
 </div>
 
+<div class="levelup" id="levelup">
+  <div class="stage">
+    <div class="roman" id="luRoman">— Level II —</div>
+    <div class="title" id="luTitle">Foreign Shores</div>
+    <div class="subtitle" id="luSubtitle">Beyond the Horizon</div>
+    <div class="ornament">✦ ✦ ✦</div>
+  </div>
+</div>
+
+<div class="modal" id="studyModal">
+  <div class="modal-card">
+    <div class="modal-head">
+      <div>
+        <h3>Study — Countries &amp; Capitals</h3>
+        <div class="sub">Grouped by level · 198 nations</div>
+      </div>
+      <input type="text" id="studySearch" placeholder="Search country or capital…" />
+      <button class="modal-close" id="studyClose">Close</button>
+    </div>
+    <div class="modal-body" id="studyBody"></div>
+  </div>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
 <script>
 /* =========================================================================
    COUNTRY DATA — keyed by ISO 3166-1 numeric code (matches world-atlas ids)
@@ -668,29 +920,95 @@ const COUNTRIES = {
 };
 
 /* =========================================================================
+   TIERS — five progressive levels of difficulty
+   ========================================================================= */
+const TIERS = [
+  {
+    key: 1,
+    roman: "I",
+    name: "Home Waters",
+    subtitle: "Familiar Shores",
+    ids: [
+      "840","124","484","076","032","826","250","276","380","724","643","300",
+      "528","620","752","756","616","372","156","392","356","410","792","764",
+      "818","710","036","554"
+    ]
+  },
+  {
+    key: 2,
+    roman: "II",
+    name: "Foreign Shores",
+    subtitle: "Beyond the Horizon",
+    ids: [
+      "578","246","208","352","040","056","348","203","642","804","688","191",
+      "192","388","214","152","604","170","862","360","608","704","458","682",
+      "376","504","566","404","231"
+    ]
+  },
+  {
+    key: 3,
+    roman: "III",
+    name: "Uncharted Seas",
+    subtitle: "Into the Unknown",
+    ids: [
+      "050","004","364","368","586","408","784","634","414","760","422","400",
+      "512","887","144","524","104","116","418","496","158","398","012","788",
+      "434","288","320","188","591","332","068","218","858","600","100"
+    ]
+  },
+  {
+    key: 4,
+    roman: "IV",
+    name: "Terra Incognita",
+    subtitle: "Lands Unmapped",
+    ids: [
+      "860","031","268","051","417","762","795","064","096","626","275","440",
+      "428","233","498","112","703","705","008","070","499","807","442","196",
+      "222","340","558","044","780","084","686","384","120","834","800","716",
+      "894","024","508","450"
+    ]
+  },
+  {
+    key: 5,
+    roman: "V",
+    name: "The Edge of the World",
+    subtitle: "Here Be Dragons",
+    ids: [
+      "706","729","728","180","178","466","854","562","148","516","072","646",
+      "108","454","426","748","694","430","324","624","478","270","768","204",
+      "262","232","140","266","226","328","740","304","242","598","548","090","540"
+    ]
+  }
+];
+
+const TIER_BY_ID = {};
+TIERS.forEach(t => t.ids.forEach(id => { TIER_BY_ID[id] = t.key; }));
+
+/* =========================================================================
    STATE
    ========================================================================= */
 const STAGE = { IDLE: "idle", COUNTRY: "country", CAPITAL: "capital", RESOLVED: "resolved" };
 let state = {
   topo: null,
   features: [],
-  pool: [],                 // ids eligible this round
-  answered: new Set(),      // ids finished
+  pool: [],
+  answered: new Set(),
+  countryHistory: new Map(), // id -> 'correct' | 'partial' | 'revealed'
   currentId: null,
   stage: STAGE.IDLE,
-  tries: 0,                 // wrong attempts on current sub-question
-  countryPoints: 0,         // points earned for country (carried into capital stage)
+  tries: 0,
   score: 0,
   streak: 0,
   best: 0,
-  regionFilter: "all",
-  recognition: null,
+  level: 1,
+  voiceMode: false,
   listening: false,
+  recognition: null
 };
 try { state.best = Number(localStorage.getItem("we_best") || 0) || 0; } catch(e) { state.best = 0; }
 
 /* =========================================================================
-   DOM
+   DOM SHORTCUTS
    ========================================================================= */
 const $ = (id) => document.getElementById(id);
 const svg = d3.select("#map");
@@ -699,7 +1017,7 @@ const tooltip = $("tooltip");
 /* =========================================================================
    MAP
    ========================================================================= */
-let projection, pathGen, gMap, gGrat, zoomBehavior;
+let projection, pathGen, gMap, gGrat, zoomBehavior, rootG;
 
 function setupMap() {
   const rect = svg.node().getBoundingClientRect();
@@ -710,24 +1028,20 @@ function setupMap() {
   pathGen = d3.geoPath(projection);
 
   svg.selectAll("*").remove();
-  const root = svg.append("g").attr("class", "root");
+  rootG = svg.append("g").attr("class", "root");
 
-  // Graticule + sphere
-  gGrat = root.append("g").attr("class", "grat-layer");
+  gGrat = rootG.append("g").attr("class", "grat-layer");
   const graticule = d3.geoGraticule().step([20, 20]);
   gGrat.append("path").datum(graticule).attr("class", "graticule").attr("d", pathGen);
   gGrat.append("path").datum({ type: "Sphere" }).attr("class", "sphere").attr("d", pathGen);
-  // Equator — dashed
   const equator = { type: "LineString", coordinates: [[-180, 0], [-90, 0], [0, 0], [90, 0], [180, 0]] };
   gGrat.append("path").datum(equator).attr("class", "equator").attr("d", pathGen);
 
-  // Countries
-  gMap = root.append("g").attr("class", "countries");
+  gMap = rootG.append("g").attr("class", "countries");
 
-  // Zoom / pan
   zoomBehavior = d3.zoom()
     .scaleExtent([1, 10])
-    .on("zoom", (ev) => root.attr("transform", ev.transform));
+    .on("zoom", (ev) => rootG.attr("transform", ev.transform));
   svg.call(zoomBehavior);
 }
 
@@ -737,8 +1051,7 @@ function renderCountries() {
     .attr("class", "country")
     .attr("d", pathGen)
     .on("mousemove", (ev, d) => {
-      // Hide tooltip for the active target country to avoid spoiling
-      if (d.id === state.currentId && (state.stage === STAGE.COUNTRY)) { tooltip.style.opacity = 0; return; }
+      if (d.id === state.currentId && state.stage === STAGE.COUNTRY) { tooltip.style.opacity = 0; return; }
       const meta = COUNTRIES[d.id];
       if (!meta) return;
       tooltip.textContent = meta.name;
@@ -751,12 +1064,24 @@ function renderCountries() {
       tooltip.style.opacity = 0;
       d3.select(ev.currentTarget).classed("hover", false);
     });
+  // Re-apply history classes after re-render
+  applyAllHistoryClasses();
 }
 
-function clearClasses() {
+function applyAllHistoryClasses() {
+  gMap.selectAll("path.country").each(function(d) {
+    const h = state.countryHistory.get(d.id);
+    const node = d3.select(this);
+    node.classed("hist-correct", h === "correct")
+        .classed("hist-partial", h === "partial")
+        .classed("hist-revealed", h === "revealed");
+  });
+}
+
+function clearActiveClasses() {
   gMap.selectAll("path.country")
     .classed("target", false)
-    .classed("correct", false)
+    .classed("correct-flash", false)
     .classed("wrong-flash", false)
     .classed("revealed", false);
 }
@@ -765,11 +1090,12 @@ function highlightTarget(id) {
   gMap.selectAll("path.country").filter(d => d.id === id).classed("target", true);
 }
 
-function centerOn(id) {
-  const feat = state.features.find(f => f.id === id);
-  if (!feat) return;
-  // Do not zoom — that would make very small countries disappear. Just keep the view.
-  // (Could optionally pan gently; skipped to preserve user's current zoom.)
+function recordHistory(id, outcome) {
+  state.countryHistory.set(id, outcome);
+  const node = gMap.selectAll("path.country").filter(d => d.id === id);
+  node.classed("hist-correct", outcome === "correct")
+      .classed("hist-partial", outcome === "partial")
+      .classed("hist-revealed", outcome === "revealed");
 }
 
 /* =========================================================================
@@ -786,12 +1112,10 @@ function normalize(s) {
     .replace(/\s+/g, " ")
     .trim();
 }
-
 function levenshtein(a, b) {
   if (a === b) return 0;
   const al = a.length, bl = b.length;
-  if (al === 0) return bl;
-  if (bl === 0) return al;
+  if (al === 0) return bl; if (bl === 0) return al;
   const dp = Array.from({ length: al + 1 }, () => new Array(bl + 1).fill(0));
   for (let i = 0; i <= al; i++) dp[i][0] = i;
   for (let j = 0; j <= bl; j++) dp[0][j] = j;
@@ -803,42 +1127,84 @@ function levenshtein(a, b) {
   }
   return dp[al][bl];
 }
-
 function matchAny(input, candidates) {
   const u = normalize(input);
   if (!u) return false;
   const cands = candidates.map(normalize);
   if (cands.includes(u)) return true;
-  // Allow 1 edit for 5+ char candidates, 2 edits for 9+
   return cands.some(c => {
     if (c.length >= 9) return levenshtein(u, c) <= 2;
     if (c.length >= 5) return levenshtein(u, c) <= 1;
     return false;
   });
 }
-
-function matchesCountry(input, meta) {
-  return matchAny(input, [meta.name, ...(meta.alt || [])]);
-}
+function matchesCountry(input, meta) { return matchAny(input, [meta.name, ...(meta.alt || [])]); }
 function matchesCapital(input, meta) {
-  const caps = [meta.capital];
-  // Some alt entries are alternate capitals (e.g., La Paz for Bolivia)
-  if (meta.alt) meta.alt.forEach(a => { if (a) caps.push(a); });
+  const caps = [meta.capital, ...(meta.alt || [])];
   return matchAny(input, caps);
+}
+
+/* =========================================================================
+   AUTOCOMPLETE / DATALIST
+   ========================================================================= */
+function updateSuggestions() {
+  const dl = $("suggestions");
+  dl.innerHTML = "";
+  if (state.stage === STAGE.IDLE || state.stage === STAGE.RESOLVED) return;
+  const tier = TIERS.find(t => t.key === state.level);
+  const ids = tier ? tier.ids : Object.keys(COUNTRIES);
+  const values = new Set();
+  ids.forEach(id => {
+    const meta = COUNTRIES[id];
+    if (!meta) return;
+    if (state.stage === STAGE.COUNTRY) {
+      values.add(meta.name);
+      (meta.alt || []).forEach(a => values.add(a));
+    } else if (state.stage === STAGE.CAPITAL) {
+      values.add(meta.capital);
+    }
+  });
+  const arr = [...values].sort((a, b) => a.localeCompare(b));
+  const frag = document.createDocumentFragment();
+  arr.forEach(v => {
+    const opt = document.createElement("option");
+    opt.value = v;
+    frag.appendChild(opt);
+  });
+  dl.appendChild(frag);
 }
 
 /* =========================================================================
    GAME FLOW
    ========================================================================= */
+function rebuildPool() {
+  const tier = TIERS.find(t => t.key === state.level);
+  if (!tier) { state.pool = []; return; }
+  const available = new Set(state.features.map(f => String(f.id).padStart(3, "0")));
+  state.pool = tier.ids.filter(id => available.has(id) && COUNTRIES[id]);
+}
+
 function pickNext() {
   const remaining = state.pool.filter(id => !state.answered.has(id));
-  if (remaining.length === 0) { showVictory(); return; }
+  if (remaining.length === 0) {
+    // Level complete
+    if (state.level < 5) {
+      state.level += 1;
+      state.answered = new Set();
+      rebuildPool();
+      updateLevelBadge();
+      showLevelUp();
+      return;
+    } else {
+      showVictory();
+      return;
+    }
+  }
   const id = remaining[Math.floor(Math.random() * remaining.length)];
   state.currentId = id;
   state.stage = STAGE.COUNTRY;
   state.tries = 0;
-  state.countryPoints = 0;
-  clearClasses();
+  clearActiveClasses();
   highlightTarget(id);
   updateTriesDots();
   $("feedback").className = "feedback";
@@ -851,8 +1217,10 @@ function pickNext() {
   $("answerInput").disabled = false;
   $("submitBtn").disabled = false;
   $("submitBtn").textContent = "Submit";
-  updateProgress();
+  updateStats();
+  updateSuggestions();
   setTimeout(() => $("answerInput").focus(), 40);
+  maybeStartListeningForStage();
 }
 
 function updateTriesDots() {
@@ -862,13 +1230,8 @@ function updateTriesDots() {
   }
 }
 
-function pointsForTries(tries) {
-  // tries = number of wrong attempts already made; 0 means first try
-  return [10, 7, 4][Math.min(tries, 2)] || 0;
-}
-function bonusForTries(tries) {
-  return [5, 3, 1][Math.min(tries, 2)] || 0;
-}
+function pointsForTries(tries) { return [10, 7, 4][Math.min(tries, 2)] || 0; }
+function bonusForTries(tries) { return [5, 3, 1][Math.min(tries, 2)] || 0; }
 
 function submitAnswer() {
   const input = $("answerInput").value;
@@ -879,7 +1242,6 @@ function submitAnswer() {
   if (state.stage === STAGE.COUNTRY) {
     if (matchesCountry(input, meta)) {
       const pts = pointsForTries(state.tries);
-      state.countryPoints = pts;
       state.score += pts;
       if (state.tries === 0) state.streak += 1; else state.streak = 0;
       if (state.streak > state.best) {
@@ -887,20 +1249,22 @@ function submitAnswer() {
         try { localStorage.setItem("we_best", String(state.best)); } catch(e) {}
       }
       gMap.selectAll("path.country").filter(d => d.id === state.currentId)
-        .classed("target", false).classed("correct", true);
+        .classed("target", false).classed("correct-flash", true);
       showFeedback("correct", `✓ ${meta.name}. +${pts}`);
+      fireConfetti();
       updateStats();
       beginCapitalStage(meta);
     } else {
       state.tries += 1;
       updateTriesDots();
       flashWrongInput();
+      state.streak = 0;
+      updateStats();
       if (state.tries >= 3) {
         revealCountry(meta);
       } else {
-        state.streak = 0;
         showFeedback("wrong", `Not quite. ${3 - state.tries} tr${3 - state.tries === 1 ? "y" : "ies"} left.`);
-        updateStats();
+        if (state.voiceMode) restartListeningSoon();
       }
     }
   } else if (state.stage === STAGE.CAPITAL) {
@@ -908,8 +1272,10 @@ function submitAnswer() {
       const bonus = bonusForTries(state.tries);
       state.score += bonus;
       showFeedback("correct", `✓ ${meta.capital}. Bonus +${bonus}`);
+      fireConfetti();
       updateStats();
-      resolveCurrent(true);
+      recordHistory(state.currentId, "correct");
+      resolveCurrent();
     } else {
       state.tries += 1;
       updateTriesDots();
@@ -918,6 +1284,7 @@ function submitAnswer() {
         revealCapital(meta);
       } else {
         showFeedback("wrong", `Not the capital. ${3 - state.tries} tr${3 - state.tries === 1 ? "y" : "ies"} left.`);
+        if (state.voiceMode) restartListeningSoon();
       }
     }
   }
@@ -932,7 +1299,9 @@ function beginCapitalStage(meta) {
   $("promptSub").textContent = "Or press Space to skip to the next country";
   $("answerInput").value = "";
   $("answerInput").placeholder = "Type the capital…";
+  updateSuggestions();
   setTimeout(() => $("answerInput").focus(), 40);
+  if (state.voiceMode) restartListeningSoon();
 }
 
 function revealCountry(meta) {
@@ -940,41 +1309,45 @@ function revealCountry(meta) {
   state.streak = 0;
   gMap.selectAll("path.country").filter(d => d.id === state.currentId)
     .classed("target", false).classed("revealed", true);
+  recordHistory(state.currentId, "revealed");
   showFeedback("reveal", `The answer was ${meta.name}. Its capital is ${meta.capital}.`);
   $("promptSub").textContent = "Press Space for the next country";
   $("answerInput").disabled = true;
   $("submitBtn").disabled = true;
   state.answered.add(state.currentId);
+  stopListening();
   updateStats();
-  updateProgress();
+  updateSuggestions();
 }
 
 function revealCapital(meta) {
   showFeedback("reveal", `The capital is ${meta.capital}.`);
   $("promptSub").textContent = "Press Space for the next country";
-  resolveCurrent(false);
+  recordHistory(state.currentId, "partial");
+  resolveCurrent();
 }
 
-function resolveCurrent(capitalGot) {
+function resolveCurrent() {
   state.stage = STAGE.RESOLVED;
   $("answerInput").disabled = true;
   $("submitBtn").disabled = true;
   state.answered.add(state.currentId);
-  updateProgress();
   $("promptSub").textContent = "Press Space for the next country";
+  stopListening();
+  updateStats();
+  updateSuggestions();
 }
 
 function advance() {
   if (state.stage === STAGE.CAPITAL) {
-    // User skipped capital bonus
+    // Skip capital bonus
     const meta = COUNTRIES[state.currentId];
     showFeedback("", `Skipped — capital is ${meta.capital}.`);
-    resolveCurrent(false);
+    recordHistory(state.currentId, "partial");
+    resolveCurrent();
     return;
   }
-  if (state.stage === STAGE.RESOLVED) {
-    pickNext();
-  } else if (state.stage === STAGE.IDLE) {
+  if (state.stage === STAGE.RESOLVED || state.stage === STAGE.IDLE) {
     pickNext();
   }
 }
@@ -999,40 +1372,59 @@ function showFeedback(kind, text) {
 function updateStats() {
   $("score").textContent = state.score;
   $("streak").textContent = state.streak;
-  $("seen").textContent = state.answered.size;
+  $("seen").textContent = `${state.answered.size} / ${state.pool.length}`;
   $("best").textContent = state.best;
 }
 
-function updateProgress() {
-  $("seen").textContent = state.answered.size;
+function updateLevelBadge() {
+  const t = TIERS.find(tt => tt.key === state.level);
+  if (!t) return;
+  $("levelNum").textContent = "Lv. " + t.roman;
+  $("levelName").textContent = t.name;
+  $("levelSelect").value = String(state.level);
 }
 
 /* =========================================================================
-   REGION / POOL
+   CONFETTI + SPARKLE
    ========================================================================= */
-function rebuildPool() {
-  const available = state.features
-    .map(f => String(f.id).padStart(3, "0"))
-    .filter(id => COUNTRIES[id]);
-  state.pool = state.regionFilter === "all"
-    ? available
-    : available.filter(id => COUNTRIES[id].region === state.regionFilter);
+function fireConfetti() {
+  if (typeof confetti !== "function") return;
+  const promptRect = $("hud-prompt-anchor") ? null : null;
+  const prompt = document.querySelector(".hud-prompt");
+  let origin = { x: 0.5, y: 0.75 };
+  if (prompt) {
+    const r = prompt.getBoundingClientRect();
+    origin = { x: (r.left + r.width / 2) / window.innerWidth, y: r.top / window.innerHeight };
+  }
+  const palette = ["#C27B5C", "#D4A088", "#F0DDD4", "#1E3A5F", "#6E8B6E", "#C79A5A"];
+  confetti({ particleCount: 48, spread: 70, startVelocity: 34, gravity: 0.9, ticks: 180, origin, colors: palette, scalar: 0.85, shapes: ["circle","square"] });
+  // A second, smaller wave
+  setTimeout(() => {
+    confetti({ particleCount: 22, spread: 110, startVelocity: 22, gravity: 1.1, ticks: 180, origin, colors: palette, scalar: 0.7 });
+  }, 120);
 }
 
-function resetRound() {
-  state.answered = new Set();
-  state.score = 0;
-  state.streak = 0;
-  state.stage = STAGE.IDLE;
-  state.tries = 0;
-  state.currentId = null;
-  clearClasses();
-  $("welcome").classList.remove("show");
-  $("victory").classList.remove("show");
-  rebuildPool();
-  updateStats();
-  updateProgress();
-  pickNext();
+/* =========================================================================
+   LEVEL UP ANIMATION
+   ========================================================================= */
+function showLevelUp() {
+  const t = TIERS.find(tt => tt.key === state.level);
+  if (!t) return;
+  $("luRoman").textContent = `— Level ${t.roman} —`;
+  $("luTitle").textContent = t.name;
+  $("luSubtitle").textContent = t.subtitle;
+  const overlay = $("levelup");
+  // Restart animations by re-adding classes
+  overlay.classList.remove("show");
+  // trigger reflow
+  void overlay.offsetWidth;
+  overlay.classList.add("show");
+  // Fire a celebratory confetti burst during the animation
+  setTimeout(fireConfetti, 450);
+  setTimeout(() => {
+    overlay.classList.remove("show");
+    pickNext();
+  }, 2800);
 }
 
 /* =========================================================================
@@ -1041,11 +1433,47 @@ function resetRound() {
 function showVictory() {
   $("victory").classList.add("show");
   $("victoryStats").innerHTML =
-    `You finished with a score of <strong>${state.score}</strong> across <strong>${state.answered.size}</strong> countries. Best streak: <strong>${state.best}</strong>.`;
+    `You conquered all five levels with a final score of <strong>${state.score}</strong>. Best streak: <strong>${state.best}</strong>.`;
+  // Big finale confetti
+  for (let i = 0; i < 3; i++) setTimeout(fireConfetti, i * 220);
 }
 
 /* =========================================================================
-   VOICE (Web Speech API)
+   RESET
+   ========================================================================= */
+function resetGame(toLevel) {
+  state.answered = new Set();
+  state.countryHistory = new Map();
+  state.score = 0;
+  state.streak = 0;
+  state.stage = STAGE.IDLE;
+  state.tries = 0;
+  state.currentId = null;
+  state.level = toLevel || 1;
+  clearActiveClasses();
+  applyAllHistoryClasses(); // will clear since map is empty
+  // Also explicitly remove any persisted classes
+  gMap.selectAll("path.country").classed("hist-correct", false).classed("hist-partial", false).classed("hist-revealed", false);
+  $("victory").classList.remove("show");
+  $("welcome").classList.remove("show");
+  rebuildPool();
+  updateLevelBadge();
+  updateStats();
+  pickNext();
+}
+
+function jumpToLevel(lvl) {
+  // Preserve history, change level, reset progress-within-level
+  state.level = lvl;
+  state.answered = new Set();
+  rebuildPool();
+  updateLevelBadge();
+  updateStats();
+  pickNext();
+}
+
+/* =========================================================================
+   VOICE (Web Speech API) — sticky / continuous
    ========================================================================= */
 function initSpeech() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -1066,54 +1494,142 @@ function initSpeech() {
     }
     $("answerInput").value = transcript.trim();
     if (ev.results[ev.results.length - 1].isFinal) {
-      rec.stop();
-      // Auto-submit on final voice result
+      try { rec.stop(); } catch(e) {}
       setTimeout(submitAnswer, 80);
     }
   };
   rec.onend = () => {
     state.listening = false;
     $("micBtn").classList.remove("listening");
+    if (state.voiceMode) {
+      // restart if still in a question stage
+      if (state.stage === STAGE.COUNTRY || state.stage === STAGE.CAPITAL) {
+        restartListeningSoon(250);
+      }
+    }
   };
   rec.onerror = (ev) => {
     state.listening = false;
     $("micBtn").classList.remove("listening");
     if (ev.error === "not-allowed" || ev.error === "service-not-allowed") {
-      showFeedback("wrong", "Microphone permission blocked. Click the mic again or allow access.");
+      state.voiceMode = false;
+      showFeedback("wrong", "Microphone permission blocked. Click the 🎤 again to retry.");
+    } else if (ev.error === "no-speech" || ev.error === "aborted") {
+      // Harmless — will restart via onend if voiceMode is on
     }
   };
   state.recognition = rec;
 }
 
-function toggleMic() {
+function startListening() {
   if (!state.recognition) return;
-  if (state.listening) {
-    state.recognition.stop();
-    return;
-  }
+  if (state.listening) return;
   try {
     state.recognition.start();
     state.listening = true;
     $("micBtn").classList.add("listening");
-    $("answerInput").value = "";
-    $("answerInput").placeholder = "Listening…";
-  } catch (e) {
-    // Sometimes start() throws if already started; ignore
+    $("answerInput").placeholder = "Listening… speak your answer";
+  } catch (e) { /* already started */ }
+}
+
+function stopListening() {
+  if (!state.recognition) return;
+  try { state.recognition.stop(); } catch (e) {}
+  state.listening = false;
+  $("micBtn").classList.remove("listening");
+}
+
+function restartListeningSoon(delay = 200) {
+  setTimeout(() => {
+    if (state.voiceMode && (state.stage === STAGE.COUNTRY || state.stage === STAGE.CAPITAL)) {
+      startListening();
+    }
+  }, delay);
+}
+
+function maybeStartListeningForStage() {
+  if (state.voiceMode) startListening();
+}
+
+function toggleVoiceMode() {
+  if (!state.recognition) return;
+  state.voiceMode = !state.voiceMode;
+  if (state.voiceMode) {
+    startListening();
+  } else {
+    stopListening();
+    $("answerInput").placeholder = state.stage === STAGE.CAPITAL ? "Type the capital…" : "Type the country…";
   }
 }
+
+/* =========================================================================
+   STUDY MODAL
+   ========================================================================= */
+function buildStudyModal() {
+  const body = $("studyBody");
+  body.innerHTML = "";
+  TIERS.forEach(t => {
+    const section = document.createElement("section");
+    section.className = "tier-section";
+    section.dataset.tier = t.key;
+    const h = document.createElement("h4");
+    h.innerHTML = `Level ${t.roman} <span class="tname">— ${t.name}</span> <span class="tcount">${t.ids.length} countries</span>`;
+    section.appendChild(h);
+    const grid = document.createElement("div");
+    grid.className = "country-grid";
+    // Sort by country name
+    const entries = t.ids.map(id => ({ id, meta: COUNTRIES[id] })).filter(e => e.meta);
+    entries.sort((a, b) => a.meta.name.localeCompare(b.meta.name));
+    entries.forEach(({ meta }) => {
+      const row = document.createElement("div");
+      row.className = "row";
+      row.dataset.search = (meta.name + " " + meta.capital + " " + (meta.alt || []).join(" ")).toLowerCase();
+      row.innerHTML = `<span class="cname">${meta.name}</span><span class="ccap">${meta.capital}</span>`;
+      grid.appendChild(row);
+    });
+    section.appendChild(grid);
+    body.appendChild(section);
+  });
+}
+
+function filterStudy(query) {
+  const q = (query || "").toLowerCase().trim();
+  document.querySelectorAll("#studyBody .tier-section").forEach(section => {
+    const rows = section.querySelectorAll(".row");
+    let visible = 0;
+    rows.forEach(row => {
+      const hit = !q || row.dataset.search.includes(q);
+      row.style.display = hit ? "" : "none";
+      if (hit) visible++;
+    });
+    section.style.display = visible === 0 ? "none" : "";
+  });
+}
+
+function openStudy() { $("studyModal").classList.add("show"); $("studySearch").focus(); }
+function closeStudy() { $("studyModal").classList.remove("show"); }
 
 /* =========================================================================
    EVENTS
    ========================================================================= */
 function wire() {
   $("submitBtn").addEventListener("click", submitAnswer);
-  $("micBtn").addEventListener("click", toggleMic);
-  $("regionSelect").addEventListener("change", (e) => {
-    state.regionFilter = e.target.value;
-    resetRound();
+  $("micBtn").addEventListener("click", toggleVoiceMode);
+  $("levelSelect").addEventListener("change", (e) => jumpToLevel(Number(e.target.value)));
+  $("resetBtn").addEventListener("click", () => {
+    if (state.score === 0 && state.answered.size === 0 && state.countryHistory.size === 0 && state.level === 1) {
+      return;
+    }
+    resetGame(1);
   });
+  $("studyBtn").addEventListener("click", openStudy);
+  $("studyClose").addEventListener("click", closeStudy);
+  $("studyFromWelcome").addEventListener("click", (e) => { e.preventDefault(); openStudy(); });
+  $("studySearch").addEventListener("input", (e) => filterStudy(e.target.value));
+  $("studyModal").addEventListener("click", (e) => { if (e.target.id === "studyModal") closeStudy(); });
+
   $("startBtn").addEventListener("click", () => { $("welcome").classList.remove("show"); pickNext(); });
-  $("playAgainBtn").addEventListener("click", resetRound);
+  $("playAgainBtn").addEventListener("click", () => resetGame(1));
   $("zoomIn").addEventListener("click", () => svg.transition().call(zoomBehavior.scaleBy, 1.5));
   $("zoomOut").addEventListener("click", () => svg.transition().call(zoomBehavior.scaleBy, 1/1.5));
   $("zoomReset").addEventListener("click", () => svg.transition().call(zoomBehavior.transform, d3.zoomIdentity));
@@ -1123,21 +1639,24 @@ function wire() {
   });
 
   document.addEventListener("keydown", (e) => {
-    // Space advances unless typing in the input (space is allowed mid-word)
+    // Escape closes study modal
+    if (e.key === "Escape" && $("studyModal").classList.contains("show")) { closeStudy(); return; }
+    // Ignore space handling when study modal is open
+    if ($("studyModal").classList.contains("show")) return;
+    // Ignore if welcome overlay is up
+    if ($("welcome").classList.contains("show")) return;
+    // Ignore if level-up is showing (auto-advances anyway)
+    if ($("levelup").classList.contains("show")) return;
+
     if (e.code !== "Space" && e.key !== " ") return;
     const activeIsInput = document.activeElement === $("answerInput");
-    // If the input is disabled (RESOLVED) OR we're in CAPITAL stage with empty input, space advances.
+
     if (state.stage === STAGE.RESOLVED || state.stage === STAGE.IDLE) {
-      if (!$("welcome").classList.contains("show") || state.stage === STAGE.IDLE) {
-        // ignore if welcome overlay is showing; its own button handles start
-        if ($("welcome").classList.contains("show")) return;
-      }
       e.preventDefault();
       advance();
       return;
     }
     if (state.stage === STAGE.CAPITAL && activeIsInput && $("answerInput").value.trim() === "") {
-      // Pressing space with empty input skips the capital bonus
       e.preventDefault();
       advance();
       return;
@@ -1147,17 +1666,16 @@ function wire() {
       advance();
       return;
     }
-    // Otherwise allow space to be typed
   });
 
   window.addEventListener("resize", () => {
     setupMap();
     renderCountries();
-    // Re-apply the current target highlight
-    if (state.currentId && state.stage === STAGE.COUNTRY) highlightTarget(state.currentId);
-    if (state.stage === STAGE.CAPITAL || state.stage === STAGE.RESOLVED) {
-      gMap.selectAll("path.country").filter(d => d.id === state.currentId)
-        .classed(state.stage === STAGE.RESOLVED ? "revealed" : "correct", true);
+    if (state.currentId) {
+      if (state.stage === STAGE.COUNTRY) highlightTarget(state.currentId);
+      if (state.stage === STAGE.RESOLVED) {
+        gMap.selectAll("path.country").filter(d => d.id === state.currentId).classed("revealed", true);
+      }
     }
   });
 }
@@ -1178,7 +1696,7 @@ async function load() {
     } catch(e) {}
   }
   if (!topo) {
-    $("loader").textContent = "Could not load the world map. Please check your internet connection.";
+    $("loader").textContent = "Could not load the world map. Please check your connection.";
     return;
   }
   state.topo = topo;
@@ -1189,6 +1707,8 @@ async function load() {
   renderCountries();
   rebuildPool();
   initSpeech();
+  buildStudyModal();
+  updateLevelBadge();
   wire();
   updateStats();
   $("welcome").classList.add("show");
