@@ -2765,37 +2765,50 @@ if ("speechSynthesis" in window) {
 function pickBritishVoice() {
   const voices = getVoices();
   if (!voices.length) return null;
-  // Preferred names across macOS/Windows/Chrome that are female British English
-  const preferredNames = /(Kate|Serena|Daniel|Karen|Martha|Moira|Siri|Fiona|Stephanie|Susan|Amelia|Google UK English Female|Microsoft Libby|Microsoft Sonia|Microsoft Hazel)/i;
-  const gbFemale = voices.find(v => /en.?GB/i.test(v.lang) && preferredNames.test(v.name) && /female|woman/i.test(v.name + " " + (v.voiceURI || "")));
-  const gbPreferred = voices.find(v => /en.?GB/i.test(v.lang) && preferredNames.test(v.name));
+  // Known-female British voices across macOS / iOS / Windows / Chrome.
+  // Note: "Daniel" (macOS) is British MALE, so he's NOT on this list.
+  const gbFemaleNames = /(Kate|Serena|Martha|Karen|Moira|Fiona|Stephanie|Susan|Amelia|Google UK English Female|Microsoft Libby|Microsoft Sonia|Microsoft Hazel)/i;
+  // Fallback: known-female English voices (non-British) — Samantha on
+  // macOS/iOS, Zira/Jenny on Windows, Google US English voices. Better to
+  // sound female-American than a random default male.
+  const anyFemaleEn = /(Samantha|Zira|Jenny|Aria|Nora|Ava|Allison|Susan|Tessa|Veena|Google US English|Google Australian English Female|Karen)/i;
+  const gbFemale = voices.find(v => /en.?GB/i.test(v.lang) && gbFemaleNames.test(v.name));
+  const femaleEn = voices.find(v => /^en/i.test(v.lang) && (gbFemaleNames.test(v.name) || anyFemaleEn.test(v.name)));
   const anyGB = voices.find(v => /en.?GB/i.test(v.lang));
   const anyEn = voices.find(v => /^en/i.test(v.lang));
-  return gbFemale || gbPreferred || anyGB || anyEn || voices[0] || null;
+  return gbFemale || femaleEn || anyGB || anyEn || voices[0] || null;
 }
 
 function speakBritish(text, onEnd) {
   const done = () => { try { onEnd && onEnd(); } catch(e) {} };
   if (Audio.muted) { done(); return; }
   if (!("speechSynthesis" in window)) { done(); return; }
-  // Only cancel if something is actively speaking/pending. Calling cancel()
-  // unconditionally appears to break the user-gesture token on some
-  // browsers (Chrome mobile in particular) — the follow-up speak() then
-  // silently fails.
+  const synth = window.speechSynthesis;
+  // Chrome bug: synth can silently enter a paused state; resume() kicks it
+  // back to life. Safe to call even when not paused.
+  try { synth.resume(); } catch(e) {}
+  // Only cancel if something is actively speaking/pending. Unconditional
+  // cancel() appears to spend the user-gesture token on some browsers.
   try {
-    if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
-      window.speechSynthesis.cancel();
-    }
+    if (synth.speaking || synth.pending) synth.cancel();
   } catch(e) {}
   const utter = new SpeechSynthesisUtterance(text);
   const v = pickBritishVoice();
   if (v) { utter.voice = v; utter.lang = v.lang; } else { utter.lang = "en-GB"; }
   utter.rate = 0.95;
   utter.pitch = 1.05;
-  utter.volume = 0.9;
+  utter.volume = 1.0;
   utter.onend = done;
   utter.onerror = done;
-  try { window.speechSynthesis.speak(utter); } catch(e) { done(); }
+  try { synth.speak(utter); } catch(e) { done(); }
+  // Chrome long-utterance workaround: the synth sometimes pauses itself
+  // every ~15s. Nudge it periodically until this utterance ends.
+  let nudge = setInterval(() => {
+    if (!synth.speaking) { clearInterval(nudge); return; }
+    try { synth.pause(); synth.resume(); } catch(e) {}
+  }, 10000);
+  utter.addEventListener("end", () => clearInterval(nudge));
+  utter.addEventListener("error", () => clearInterval(nudge));
 }
 
 function updateLevelBadge() {
