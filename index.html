@@ -2816,14 +2816,11 @@ function speakBritish(text, onEnd) {
   if (Audio.muted) { done(); return; }
   if (!("speechSynthesis" in window)) { done(); return; }
   const synth = window.speechSynthesis;
-  // Chrome bug: synth can silently enter a paused state; resume() kicks it
-  // back to life. Safe to call even when not paused.
-  try { synth.resume(); } catch(e) {}
-  // Only cancel if something is actively speaking/pending. Unconditional
-  // cancel() appears to spend the user-gesture token on some browsers.
-  try {
-    if (synth.speaking || synth.pending) synth.cancel();
-  } catch(e) {}
+  // Only resume if actually paused — calling resume() unconditionally on
+  // Chrome can delay or deadlock the queue.
+  try { if (synth.paused) synth.resume(); } catch(e) {}
+  // Only cancel if something is actively speaking/pending.
+  try { if (synth.speaking || synth.pending) synth.cancel(); } catch(e) {}
   const utter = new SpeechSynthesisUtterance(text);
   const v = pickBritishVoice();
   if (v) { utter.voice = v; utter.lang = v.lang; } else { utter.lang = "en-GB"; }
@@ -2833,14 +2830,6 @@ function speakBritish(text, onEnd) {
   utter.onend = done;
   utter.onerror = done;
   try { synth.speak(utter); } catch(e) { done(); }
-  // Chrome long-utterance workaround: the synth sometimes pauses itself
-  // every ~15s. Nudge it periodically until this utterance ends.
-  let nudge = setInterval(() => {
-    if (!synth.speaking) { clearInterval(nudge); return; }
-    try { synth.pause(); synth.resume(); } catch(e) {}
-  }, 10000);
-  utter.addEventListener("end", () => clearInterval(nudge));
-  utter.addEventListener("error", () => clearInterval(nudge));
 }
 
 function updateLevelBadge() {
@@ -3207,31 +3196,43 @@ function setStudyMode(mode) {
 /* =========================================================================
    EVENTS
    ========================================================================= */
-// Prime mic permission on the welcome screen's first user gesture. Granting
-// permission before the Start click avoids Chrome's ~15s speechSynthesis
-// stall that happens when the permission dialog competes with a speak().
-let _micPrimed = false;
-function primeMicPermission() {
-  if (_micPrimed) return;
-  _micPrimed = true;
-  if (!state.voiceMode) return;
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
-  navigator.mediaDevices.getUserMedia({ audio: true })
-    .then(stream => { state.micStream = stream; })
-    .catch(() => { /* user denied — speakBritish will still run */ });
+// Warm up mic permission + the speechSynthesis engine on the welcome
+// screen's first user gesture. On Chrome, both getUserMedia and the first
+// speak() can stall for several seconds if we only kick them off at Start
+// click — priming during the welcome lets them finish while the user is
+// still typing/choosing mode.
+let _welcomePrimed = false;
+function primeWelcome() {
+  if (_welcomePrimed) return;
+  _welcomePrimed = true;
+  // 1. Mic permission
+  if (state.voiceMode && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+    navigator.mediaDevices.getUserMedia({ audio: true })
+      .then(stream => { state.micStream = stream; })
+      .catch(() => {});
+  }
+  // 2. speechSynthesis warm-up — a silent utterance unblocks Chrome's
+  //    TTS engine so the real greeting plays immediately on Start.
+  if ("speechSynthesis" in window) {
+    try {
+      const prime = new SpeechSynthesisUtterance(" ");
+      prime.volume = 0;
+      window.speechSynthesis.speak(prime);
+    } catch(e) {}
+  }
 }
 
 function wire() {
   $("submitBtn").addEventListener("click", submitAnswer);
   $("micBtn").addEventListener("click", toggleVoiceMode);
 
-  // Prime mic on first interaction with anything on the welcome card —
-  // focusing a name input, tapping a mode tab, or touching the card itself.
+  // Warm up mic permission AND speechSynthesis on first interaction with
+  // anything on the welcome card — focusing a name input, tapping a mode
+  // tab, or tapping the card itself.
   const welcomeCard = document.querySelector("#welcome .card");
   if (welcomeCard) {
-    const primeOnce = () => primeMicPermission();
-    welcomeCard.addEventListener("pointerdown", primeOnce, { once: true });
-    welcomeCard.addEventListener("focusin", primeOnce, { once: true });
+    welcomeCard.addEventListener("pointerdown", primeWelcome);
+    welcomeCard.addEventListener("focusin", primeWelcome);
   }
   const menuBtn = document.getElementById("mobileMenuBtn");
   if (menuBtn) {
@@ -3370,7 +3371,10 @@ function wire() {
         startListening();
       }
     };
-    setTimeout(releaseListening, 3500); // fallback (a bit longer for multi-player greeting)
+    // Only a long fallback — the normal release path is speakBritish's onend
+    // callback. A short fallback risks turning the mic on before the
+    // greeting finishes playing (especially when Chrome delays the speech).
+    setTimeout(releaseListening, 15000);
     speakBritish(greet, releaseListening);
 
     // 2. Grab a persistent mic stream so subsequent SpeechRecognition
