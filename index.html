@@ -105,6 +105,29 @@
     letter-spacing: 0.28em;
   }
 
+  /* Pulsing marker used to highlight ocean targets prominently */
+  .ocean-pulse { pointer-events: none; opacity: 0; transition: opacity 0.25s; }
+  .ocean-pulse.show { opacity: 1; }
+  .ocean-pulse .core {
+    fill: var(--copper);
+    stroke: var(--copper-dark);
+    stroke-width: 1.2;
+  }
+  .ocean-pulse .ring {
+    fill: none;
+    stroke: var(--copper);
+    stroke-width: 2.5;
+    transform-origin: center;
+    transform-box: fill-box;
+    animation: oceanPulse 1.8s ease-out infinite;
+  }
+  .ocean-pulse .ring.r2 { animation-delay: 0.6s; }
+  .ocean-pulse .ring.r3 { animation-delay: 1.2s; }
+  @keyframes oceanPulse {
+    0%   { transform: scale(0.6); opacity: 0.85; stroke-width: 3; }
+    100% { transform: scale(3.4); opacity: 0;    stroke-width: 0.5; }
+  }
+
   .graticule { fill: none; stroke: var(--graticule); stroke-width: 0.35; stroke-opacity: 0.6; }
   .equator { stroke: var(--graticule); stroke-width: 0.5; stroke-dasharray: 3 5; fill: none; }
   .sphere { fill: none; stroke: var(--land-stroke); stroke-width: 0.6; }
@@ -1721,7 +1744,7 @@ function setupMap() {
 
   gMap = rootG.append("g").attr("class", "countries");
 
-  // Ocean labels (always visible; highlighted when they are the target)
+  // Ocean labels (hidden by default; shown after answering)
   const gOceans = rootG.append("g").attr("class", "ocean-labels");
   Object.entries(OCEANS).forEach(([id, o]) => {
     const pt = projection(o.center);
@@ -1736,6 +1759,14 @@ function setupMap() {
       .style("font-size", (o.labelSize || 14) + "px")
       .text("");
   });
+
+  // Pulsing marker used to highlight the target ocean — single instance that
+  // gets moved into position when an ocean becomes the target.
+  const pulse = rootG.append("g").attr("class", "ocean-pulse").attr("id", "oceanPulse");
+  pulse.append("circle").attr("class", "ring r1").attr("r", 6);
+  pulse.append("circle").attr("class", "ring r2").attr("r", 6);
+  pulse.append("circle").attr("class", "ring r3").attr("r", 6);
+  pulse.append("circle").attr("class", "core").attr("r", 5);
 
   zoomBehavior = d3.zoom()
     .scaleExtent([1, 10])
@@ -1819,13 +1850,22 @@ function clearActiveClasses() {
     const h = state.countryHistory.get(id);
     d3.select(this).text(h ? o.name : "").classed("target", false);
   });
+  d3.select("#oceanPulse").classed("show", false);
 }
 
 function highlightTarget(id) {
   const meta = COUNTRIES[id];
   if (meta && meta.ocean) {
-    // Hide the name while it's the target so the player has to know which ocean it is.
-    d3.select("#oceanLabel_" + id).classed("target", true).text("• • •");
+    // Hide the ocean's name while it's the target; show a pulsing marker instead.
+    d3.select("#oceanLabel_" + id).classed("target", true).text("");
+    const o = OCEANS[id];
+    const pulse = d3.select("#oceanPulse");
+    if (o && pulse.size()) {
+      const pt = projection(o.center);
+      if (pt) {
+        pulse.attr("transform", `translate(${pt[0]}, ${pt[1]})`).classed("show", true);
+      }
+    }
   } else {
     gMap.selectAll("path.country").filter(d => d.id === id).classed("target", true);
   }
@@ -2157,6 +2197,7 @@ function submitAnswer() {
       }
       if (meta.ocean) {
         d3.select("#oceanLabel_" + state.currentId).classed("target", false).text(meta.name);
+        d3.select("#oceanPulse").classed("show", false);
       } else {
         gMap.selectAll("path.country").filter(d => d.id === state.currentId)
           .classed("target", false).classed("correct-flash", true);
@@ -2231,6 +2272,7 @@ function revealCountry(meta) {
   state.streak = 0;
   if (meta.ocean) {
     d3.select("#oceanLabel_" + state.currentId).classed("target", false).text(meta.name);
+    d3.select("#oceanPulse").classed("show", false);
   } else {
     gMap.selectAll("path.country").filter(d => d.id === state.currentId)
       .classed("target", false).classed("revealed", true);
