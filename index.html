@@ -194,7 +194,14 @@
     object-fit: cover;
   }
 
-  /* Facts modal */
+  /* Facts modal — transparent backdrop so the map shows through */
+  #factsModal {
+    background: transparent;
+    backdrop-filter: none;
+  }
+  #factsModal .facts-card {
+    box-shadow: 0 16px 50px rgba(30,58,95,0.22), 0 2px 8px rgba(0,0,0,0.08);
+  }
   .facts-card {
     background: var(--card-bg);
     border: 1px solid var(--card-border);
@@ -1770,6 +1777,7 @@ function advance() {
     // Skip capital bonus
     const meta = COUNTRIES[state.currentId];
     showFeedback("", `Skipped — capital is ${meta.capital}.`);
+    speakBritish(`The capital is ${meta.capital}.`);
     recordHistory(state.currentId, "partial");
     resolveCurrent();
     return;
