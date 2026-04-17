@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="0" />
 <title>Tallulah the Explorer — A Map Game</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1361,7 +1364,7 @@ let state = {
   streak: 0,
   best: 0,
   level: 1,
-  voiceMode: false,
+  voiceMode: true,
   listening: false,
   recognition: null,
   studyMapMode: false,
@@ -1371,6 +1374,7 @@ let state = {
 };
 try { state.autoZoom = JSON.parse(localStorage.getItem("we_autoZoom") || "true"); } catch(e) {}
 try { state.flagMode = JSON.parse(localStorage.getItem("we_flagMode") || "false"); } catch(e) {}
+try { state.voiceMode = JSON.parse(localStorage.getItem("we_voiceMode") || "true"); } catch(e) {}
 try { state.best = Number(localStorage.getItem("we_best") || 0) || 0; } catch(e) { state.best = 0; }
 
 /* =========================================================================
@@ -2514,6 +2518,7 @@ function maybeStartListeningForStage() {
 function toggleVoiceMode() {
   if (!state.recognition) return;
   state.voiceMode = !state.voiceMode;
+  try { localStorage.setItem("we_voiceMode", JSON.stringify(state.voiceMode)); } catch(e) {}
   if (state.voiceMode) {
     hideSuggest();
     startListening();
@@ -2640,6 +2645,8 @@ function wire() {
     const nm = $("nameInput") && $("nameInput").value.trim();
     if (nm) setPlayerName(nm); else applyPlayerName();
     await audioInit();
+    const greet = nm || getPlayerName();
+    speakBritish(`Hello, ${greet}! Welcome, Explorer.`);
     $("welcome").classList.remove("show");
     startAmbient(state.level);
     pickNext();
