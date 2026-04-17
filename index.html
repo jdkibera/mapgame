@@ -705,6 +705,35 @@
   }
   body.multi-mode .turn-banner { display: block; }
 
+  /* Player chip — a colored dot on each hud-players cell */
+  .hud-players .pstat .pchip {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--player-chip, var(--copper-light));
+    margin-right: 5px;
+    vertical-align: baseline;
+    transform: translateY(1px);
+  }
+  .hud-players .pstat.active {
+    background: var(--player-halo, var(--copper-pale));
+    box-shadow: 0 0 0 1px var(--player-chip, var(--copper-light)) inset;
+  }
+  .hud-players .pstat.active .pname { color: var(--navy); font-weight: 600; }
+
+  /* Turn halo around the input — semi-transparent ring in the current
+     player's hue. Scaled down on small screens so it doesn't clip. */
+  body.multi-mode .input-wrap {
+    border-radius: 8px;
+    transition: box-shadow 0.35s ease;
+    box-shadow: 0 0 0 18px var(--turn-halo, transparent);
+  }
+  @media (max-width: 760px) {
+    body.multi-mode .input-wrap {
+      box-shadow: 0 0 0 8px var(--turn-halo, transparent);
+    }
+  }
+
   .secondary-link {
     display: inline-block; margin-top: 14px;
     color: var(--copper); font-style: italic;
@@ -1651,6 +1680,16 @@ function flagUrl(id, size = "w160") {
    STATE
    ========================================================================= */
 const STAGE = { IDLE: "idle", COUNTRY: "country", CAPITAL: "capital", RESOLVED: "resolved" };
+// Per-player pastel palette tuned to sit alongside the copper/navy aesthetic.
+// Kept muted + warm so they feel cartographic rather than candy-bright.
+const PLAYER_HUES = [
+  { halo: "rgba(194,123,92,0.32)",  chip: "#E3B49E" }, // copper / terracotta
+  { halo: "rgba(110,139,110,0.32)", chip: "#B5C9B0" }, // sage
+  { halo: "rgba( 90,120,150,0.32)", chip: "#B3C5D6" }, // dusty blue
+  { halo: "rgba(170,140,180,0.32)", chip: "#CCBBD1" }, // soft lavender
+  { halo: "rgba(199,154,90,0.30)",  chip: "#DBC88E" }, // wheat gold
+];
+function hueFor(index) { return PLAYER_HUES[index % PLAYER_HUES.length]; }
 function makePlayer(name) {
   return { name: name || "Explorer", score: 0, levelScore: 0, streak: 0, best: 0, correct: 0 };
 }
@@ -2600,12 +2639,20 @@ function updateStats() {
     const hud = $("hudPlayers");
     hud.innerHTML = "";
     state.players.forEach((pl, i) => {
+      const h = hueFor(i);
       const cell = document.createElement("div");
       cell.className = "pstat" + (i === state.currentPlayerIdx ? " active" : "");
-      cell.innerHTML = `<span class="pname"></span><span class="pscore">${pl.score}</span>`;
-      cell.querySelector(".pname").textContent = pl.name;
+      cell.style.setProperty("--player-chip", h.chip);
+      cell.style.setProperty("--player-halo", h.halo);
+      cell.innerHTML = `<span class="pname"><span class="pchip"></span></span><span class="pscore">${pl.score}</span>`;
+      // Append player name as text after the chip so HTML injection is safe.
+      const nameEl = cell.querySelector(".pname");
+      nameEl.appendChild(document.createTextNode(pl.name));
       hud.appendChild(cell);
     });
+    // Set the input-halo color on the body so CSS picks it up.
+    const h = hueFor(state.currentPlayerIdx);
+    document.body.style.setProperty("--turn-halo", h.halo);
   }
   // Turn banner in the prompt card (visible only in multi via body.multi-mode)
   const banner = $("turnBanner");
