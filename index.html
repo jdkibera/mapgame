@@ -2394,24 +2394,12 @@ function pickNext() {
   updateStats();
   updateSuggestions();
   setTimeout(() => $("answerInput").focus(), 40);
-  // Multi mode: announce whose turn it is before starting the mic, so the
-  // agent's voice isn't captured as the player's answer. Skip on the very
-  // first question — the welcome greeting already names the first player.
-  if (state.mode === "multi" && state.turnJustAdvanced) {
-    state.turnJustAdvanced = false;
-    if (state.skipFirstTurnAnnounce) {
-      state.skipFirstTurnAnnounce = false;
-      maybeStartListeningForStage();
-      return;
-    }
-    state.suppressListening = true;
-    setTimeout(() => { state.suppressListening = false; }, 2200);
-    speakBritish(`${cur().name}, your turn.`, () => {
-      state.suppressListening = false;
-      maybeStartListeningForStage();
-    });
-    return;
-  }
+  // Turn changes are communicated visually (banner + highlighted scorecard).
+  // Mid-game agent speech was removed — it competed with the user's voice
+  // input and tripped the mic's echo suppression. The launch greeting is
+  // the only agent utterance now.
+  state.turnJustAdvanced = false;
+  state.skipFirstTurnAnnounce = false;
   maybeStartListeningForStage();
 }
 
@@ -2541,7 +2529,6 @@ function revealCountry(meta) {
   stopListening();
   playRevealSfx();
   if (!meta.ocean) showPromptFlag(state.currentId); else hidePromptFlag();
-  speakBritish(msg);
   updateStats();
   updateSuggestions();
   scheduleAutoAdvance(3500);
@@ -2552,7 +2539,6 @@ function revealCapital(meta) {
   $("promptSub").textContent = "Press Space for the next country";
   recordHistory(state.currentId, "partial");
   playRevealSfx();
-  speakBritish(`The capital is ${meta.capital}.`);
   resolveCurrent();
 }
 
@@ -2573,8 +2559,7 @@ function advance() {
     // Skip capital bonus
     const meta = COUNTRIES[state.currentId];
     showFeedback("", `Skipped — capital is ${meta.capital}.`);
-    speakBritish(`The capital is ${meta.capital}.`);
-    recordHistory(state.currentId, "partial");
+      recordHistory(state.currentId, "partial");
     resolveCurrent();
     return;
   }
@@ -2860,7 +2845,6 @@ function showLevelUp() {
       else if (tied.length > 1) msg = `Tied at ${top.levelScore}: ${tied.map(p => p.name).join(", ")}`;
       else msg = `${top.name} wins the level with ${top.levelScore} points`;
       winnerEl.textContent = msg;
-      speakBritish(msg);
     } else {
       winnerEl.textContent = "";
     }
@@ -2903,8 +2887,6 @@ function showVictory() {
     ).join("");
     $("victoryStats").innerHTML =
       `${header}<div style="margin-top:12px; text-align:left; max-width:320px; margin-left:auto; margin-right:auto;">${rows}</div>`;
-    if (tied.length === 1) speakBritish(`${top.name} wins with ${top.score} points.`);
-    else speakBritish(`A tie! ${tied.map(p => p.name).join(" and ")} both finish with ${top.score} points.`);
   } else {
     const p = cur();
     $("victoryStats").innerHTML =
@@ -3236,6 +3218,22 @@ function wire() {
       document.querySelectorAll(".mode-pane").forEach(pane => {
         pane.hidden = pane.dataset.pane !== selectedMode;
       });
+      const welcomeH2 = document.getElementById("welcomeGreeting");
+      if (selectedMode === "multi") {
+        // Prefill the first player slot with whatever was typed into the
+        // solo name field (so switching modes doesn't lose their name).
+        const soloName = ($("nameInput") && $("nameInput").value.trim()) || "";
+        const firstSlot = document.querySelector(".player-name");
+        if (firstSlot && !firstSlot.value.trim() && soloName) {
+          firstSlot.value = soloName;
+        }
+        if (welcomeH2) welcomeH2.textContent = "Welcome, Explorers!";
+      } else {
+        if (welcomeH2) {
+          const n = ($("nameInput") && $("nameInput").value.trim()) || "Tallulah";
+          welcomeH2.textContent = `Welcome, ${n}`;
+        }
+      }
     });
   });
 
@@ -3282,10 +3280,6 @@ function wire() {
     state.currentPlayerIdx = state.players.length - 1; // first advancePlayer rolls to 0
     document.body.classList.toggle("multi-mode", state.mode === "multi");
     applyPlayerName();
-    // Skip the auto "Name, your turn" announcement for the VERY first
-    // question — the welcome greeting already names who goes first, and
-    // speakBritish()'s internal cancel() would otherwise cut it off.
-    state.skipFirstTurnAnnounce = true;
     const firstUp = state.players[0].name;
     const greet = state.mode === "multi"
       ? `Hello explorers — ${state.players.map(p => p.name).join(", ")}. ${firstUp}, you're up first.`
