@@ -175,6 +175,87 @@
   .tbtn.muted { color: var(--text-light); }
   .tbtn.muted .sound-on { display: none; }
   .tbtn.muted .sound-off { display: inline-block !important; }
+  .tbtn.toggled {
+    background: var(--navy);
+    color: var(--cream);
+    border-color: var(--navy);
+  }
+  .tbtn.toggled:hover { background: var(--navy-soft); color: var(--cream); }
+
+  /* Flag shown in the prompt card */
+  .hud-prompt { position: fixed; } /* ensure absolute flag positions correctly */
+  .prompt-flag {
+    position: absolute;
+    top: 14px; right: 18px;
+    width: 58px; height: auto;
+    border: 1px solid var(--card-border);
+    border-radius: 3px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    object-fit: cover;
+  }
+
+  /* Facts modal */
+  .facts-card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    width: min(420px, calc(100vw - 36px));
+    box-shadow: 0 12px 40px rgba(30,58,95,0.18);
+    overflow: hidden;
+  }
+  .facts-flag-wrap {
+    background: linear-gradient(180deg, var(--cream) 0%, var(--warm-gray) 100%);
+    padding: 22px 22px 14px 22px;
+    text-align: center;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .facts-flag-wrap img {
+    max-width: 200px; max-height: 120px;
+    border: 1px solid var(--card-border);
+    border-radius: 4px;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+  }
+  .facts-head {
+    padding: 12px 22px 10px 22px;
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .facts-head h3 {
+    margin: 0;
+    font-family: var(--font-heading);
+    color: var(--navy);
+    font-weight: 500;
+    font-size: 1.6rem;
+  }
+  .facts-head .region {
+    margin-top: 2px;
+    font-style: italic; font-size: 0.8rem;
+    letter-spacing: 0.18em; color: var(--copper);
+    text-transform: uppercase;
+  }
+  .facts-list {
+    margin: 0; padding: 14px 22px 18px 22px;
+    display: grid; grid-template-columns: 110px 1fr; row-gap: 8px; column-gap: 14px;
+    font-size: 0.92rem;
+  }
+  .facts-list dt {
+    color: var(--text-light);
+    font-family: var(--font-body);
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    font-style: italic;
+    padding-top: 2px;
+  }
+  .facts-list dd {
+    margin: 0;
+    color: var(--navy);
+    font-family: var(--font-heading);
+    font-size: 1rem;
+  }
+  .facts-list dd.loading {
+    color: var(--text-light); font-style: italic; font-family: var(--font-body); font-size: 0.88rem;
+  }
 
   .hud-footer {
     bottom: 6px; left: 50%;
@@ -200,7 +281,7 @@
 
   /* Prompt card */
   .hud-prompt {
-    bottom: 22px; left: 50%; transform: translateX(-50%);
+    bottom: 34px; left: 50%; transform: translateX(-50%);
     width: min(660px, calc(100vw - 36px));
     padding: 20px 26px 18px 26px;
   }
@@ -708,6 +789,10 @@
       <option value="5">Level V — Edge of the World</option>
     </select>
   </button>
+  <button class="tbtn" id="flagBtn" title="Flag mode — show the country's flag while you guess">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+    <span class="label">Flag</span>
+  </button>
   <button class="tbtn" id="soundBtn" title="Toggle sound">
     <svg class="sound-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
     <svg class="sound-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
@@ -722,6 +807,7 @@
 <footer class="hud hud-footer">© Kibera LLC</footer>
 
 <section class="hud hud-prompt">
+  <img id="promptFlag" class="prompt-flag" alt="Flag" style="display:none" />
   <div class="prompt-row">
     <div class="prompt-eyebrow" id="promptEyebrow">Name this country</div>
     <div class="prompt-question" id="promptQuestion">Loading…</div>
@@ -786,6 +872,28 @@
     <div class="title" id="luTitle">Foreign Shores</div>
     <div class="subtitle" id="luSubtitle">Beyond the Horizon</div>
     <div class="ornament">✦ ✦ ✦</div>
+  </div>
+</div>
+
+<div class="modal" id="factsModal">
+  <div class="facts-card">
+    <div class="facts-flag-wrap">
+      <img id="factsFlag" alt="Flag" />
+    </div>
+    <div class="facts-head">
+      <div>
+        <h3 id="factsName">Country</h3>
+        <div class="region" id="factsRegion">—</div>
+      </div>
+      <button class="modal-close" id="factsClose">Close</button>
+    </div>
+    <dl class="facts-list">
+      <dt>Capital</dt><dd id="factsCapital">—</dd>
+      <dt>Population</dt><dd id="factsPopulation" class="loading">loading…</dd>
+      <dt>Languages</dt><dd id="factsLanguages" class="loading">loading…</dd>
+      <dt>Region</dt><dd id="factsSubregion" class="loading">loading…</dd>
+      <dt>People</dt><dd id="factsDemonym" class="loading">loading…</dd>
+    </dl>
   </div>
 </div>
 
@@ -1085,6 +1193,43 @@ const TIER_BY_ID = {};
 TIERS.forEach(t => t.ids.forEach(id => { TIER_BY_ID[id] = t.key; }));
 
 /* =========================================================================
+   ISO 3166-1 numeric → alpha-2 (for flag URLs and REST Countries lookups)
+   ========================================================================= */
+const ISO_A2 = {
+  "004":"AF","008":"AL","012":"DZ","020":"AD","024":"AO","028":"AG","032":"AR","051":"AM",
+  "036":"AU","040":"AT","031":"AZ","044":"BS","048":"BH","050":"BD","052":"BB","112":"BY",
+  "056":"BE","084":"BZ","204":"BJ","064":"BT","068":"BO","070":"BA","072":"BW","076":"BR",
+  "096":"BN","100":"BG","854":"BF","108":"BI","132":"CV","116":"KH","120":"CM","124":"CA",
+  "140":"CF","148":"TD","152":"CL","156":"CN","170":"CO","174":"KM","178":"CG","180":"CD",
+  "188":"CR","384":"CI","191":"HR","192":"CU","196":"CY","203":"CZ","208":"DK","262":"DJ",
+  "212":"DM","214":"DO","218":"EC","818":"EG","222":"SV","226":"GQ","232":"ER","233":"EE",
+  "748":"SZ","231":"ET","242":"FJ","246":"FI","250":"FR","266":"GA","270":"GM","268":"GE",
+  "276":"DE","288":"GH","300":"GR","304":"GL","308":"GD","320":"GT","324":"GN","624":"GW",
+  "328":"GY","332":"HT","340":"HN","348":"HU","352":"IS","356":"IN","360":"ID","364":"IR",
+  "368":"IQ","372":"IE","376":"IL","380":"IT","388":"JM","392":"JP","400":"JO","398":"KZ",
+  "404":"KE","296":"KI","408":"KP","410":"KR","414":"KW","417":"KG","418":"LA","428":"LV",
+  "422":"LB","426":"LS","430":"LR","434":"LY","438":"LI","440":"LT","442":"LU","450":"MG",
+  "454":"MW","458":"MY","462":"MV","466":"ML","470":"MT","584":"MH","478":"MR","480":"MU",
+  "484":"MX","583":"FM","498":"MD","492":"MC","496":"MN","499":"ME","504":"MA","508":"MZ",
+  "104":"MM","516":"NA","520":"NR","524":"NP","528":"NL","554":"NZ","558":"NI","562":"NE",
+  "566":"NG","807":"MK","578":"NO","512":"OM","586":"PK","585":"PW","275":"PS","591":"PA",
+  "598":"PG","600":"PY","604":"PE","608":"PH","616":"PL","620":"PT","634":"QA","642":"RO",
+  "643":"RU","646":"RW","659":"KN","662":"LC","670":"VC","882":"WS","674":"SM","678":"ST",
+  "682":"SA","686":"SN","688":"RS","690":"SC","694":"SL","702":"SG","703":"SK","705":"SI",
+  "090":"SB","706":"SO","710":"ZA","728":"SS","724":"ES","144":"LK","729":"SD","740":"SR",
+  "752":"SE","756":"CH","760":"SY","158":"TW","762":"TJ","834":"TZ","764":"TH","626":"TL",
+  "768":"TG","776":"TO","780":"TT","788":"TN","792":"TR","795":"TM","798":"TV","800":"UG",
+  "804":"UA","784":"AE","826":"GB","840":"US","858":"UY","860":"UZ","548":"VU","336":"VA",
+  "862":"VE","704":"VN","540":"NC","887":"YE","894":"ZM","716":"ZW"
+};
+
+function flagUrl(id, size = "w160") {
+  const a2 = ISO_A2[id];
+  if (!a2) return null;
+  return `https://flagcdn.com/${size}/${a2.toLowerCase()}.png`;
+}
+
+/* =========================================================================
    STATE
    ========================================================================= */
 const STAGE = { IDLE: "idle", COUNTRY: "country", CAPITAL: "capital", RESOLVED: "resolved" };
@@ -1105,7 +1250,9 @@ let state = {
   listening: false,
   recognition: null,
   studyMapMode: false,
+  flagMode: false,
 };
+try { state.flagMode = JSON.parse(localStorage.getItem("we_flagMode") || "false"); } catch(e) {}
 try { state.best = Number(localStorage.getItem("we_best") || 0) || 0; } catch(e) { state.best = 0; }
 
 /* =========================================================================
@@ -1178,14 +1325,16 @@ function stopAmbient() {
 
 function playCorrectSfx() {
   if (!Audio.ready || Audio.muted) return;
-  const synth = new Tone.PolySynth(Tone.Synth, {
-    envelope: { attack: 0.01, decay: 0.15, sustain: 0.25, release: 0.6 }
+  // Soft single bell — pleasant enough to hear repeatedly without fatigue
+  const synth = new Tone.Synth({
+    oscillator: { type: "sine" },
+    envelope: { attack: 0.004, decay: 0.4, sustain: 0, release: 1.6 }
   }).toDestination();
-  synth.volume.value = -12;
+  synth.volume.value = -22;
   const t0 = Tone.now();
-  synth.triggerAttackRelease(["C5","E5","G5"], "16n", t0);
-  synth.triggerAttackRelease(["C6"], "8n", t0 + 0.16);
-  setTimeout(() => synth.dispose(), 1400);
+  synth.triggerAttackRelease("E6", "8n", t0);
+  synth.triggerAttackRelease("G6", "4n", t0 + 0.09);
+  setTimeout(() => synth.dispose(), 2200);
 }
 
 function playWrongSfx() {
@@ -1310,20 +1459,21 @@ function renderCountries() {
     .attr("class", "country")
     .attr("d", pathGen)
     .on("mousemove", (ev, d) => {
-      // During the game, hide tooltip for the active target country.
-      if (!state.studyMapMode && d.id === state.currentId && state.stage === STAGE.COUNTRY) {
-        tooltip.style.opacity = 0; return;
-      }
+      // Only show tooltip in study map mode — never during the game itself.
+      if (!state.studyMapMode) { tooltip.style.opacity = 0; return; }
       const meta = COUNTRIES[d.id];
       if (!meta) return;
-      // In study map mode, show name AND capital. In-game, show name only.
-      tooltip.innerHTML = state.studyMapMode
-        ? `<strong>${meta.name}</strong><span style="color:var(--text-med);font-style:italic;font-weight:400;"> · ${meta.capital}</span>`
-        : meta.name;
+      tooltip.innerHTML = `<strong>${meta.name}</strong><span style="color:var(--text-med);font-style:italic;font-weight:400;"> · ${meta.capital}</span>`;
       tooltip.style.left = ev.clientX + "px";
       tooltip.style.top = ev.clientY + "px";
       tooltip.style.opacity = 1;
       d3.select(ev.currentTarget).classed("hover", true);
+    })
+    .on("click", (ev, d) => {
+      if (state.studyMapMode) {
+        const meta = COUNTRIES[d.id];
+        if (meta) openFacts(d.id);
+      }
     })
     .on("mouseleave", (ev) => {
       tooltip.style.opacity = 0;
@@ -1482,6 +1632,8 @@ function pickNext() {
   $("answerInput").disabled = false;
   $("submitBtn").disabled = false;
   $("submitBtn").textContent = "Submit";
+  // Flag: show now only if Flag mode is on; otherwise reveal later
+  if (state.flagMode) showPromptFlag(id); else hidePromptFlag();
   updateStats();
   updateSuggestions();
   setTimeout(() => $("answerInput").focus(), 40);
@@ -1518,6 +1670,7 @@ function submitAnswer() {
       showFeedback("correct", `✓ ${meta.name}. +${pts}`);
       fireConfetti();
       playCorrectSfx();
+      showPromptFlag(state.currentId); // always show flag after correct country
       updateStats();
       beginCapitalStage(meta);
     } else {
@@ -1586,6 +1739,8 @@ function revealCountry(meta) {
   state.answered.add(state.currentId);
   stopListening();
   playRevealSfx();
+  showPromptFlag(state.currentId);
+  speakBritish(`The answer was ${meta.name}. Its capital is ${meta.capital}.`);
   updateStats();
   updateSuggestions();
 }
@@ -1595,6 +1750,7 @@ function revealCapital(meta) {
   $("promptSub").textContent = "Press Space for the next country";
   recordHistory(state.currentId, "partial");
   playRevealSfx();
+  speakBritish(`The capital is ${meta.capital}.`);
   resolveCurrent();
 }
 
@@ -1645,6 +1801,136 @@ function updateStats() {
   $("streak").textContent = state.streak;
   $("seen").textContent = `${state.answered.size} / ${state.pool.length}`;
   $("best").textContent = state.best;
+}
+
+function showPromptFlag(id) {
+  const img = $("promptFlag");
+  const url = flagUrl(id);
+  if (!url) { img.style.display = "none"; return; }
+  img.src = url;
+  img.alt = (COUNTRIES[id] && COUNTRIES[id].name) || "Flag";
+  img.style.display = "";
+}
+
+function hidePromptFlag() {
+  const img = $("promptFlag");
+  img.style.display = "none";
+  img.removeAttribute("src");
+}
+
+function updateFlagModeUI() {
+  const btn = $("flagBtn");
+  if (!btn) return;
+  btn.classList.toggle("toggled", state.flagMode);
+  const label = btn.querySelector(".label");
+  if (label) label.textContent = state.flagMode ? "Flag on" : "Flag";
+}
+
+function toggleFlagMode() {
+  state.flagMode = !state.flagMode;
+  try { localStorage.setItem("we_flagMode", JSON.stringify(state.flagMode)); } catch(e) {}
+  updateFlagModeUI();
+  // Re-evaluate whether to show the flag right now
+  if (state.currentId && state.stage === STAGE.COUNTRY) {
+    if (state.flagMode) showPromptFlag(state.currentId);
+    else hidePromptFlag();
+  }
+}
+
+/* =========================================================================
+   FACTS MODAL — shown on click in study-map mode
+   ========================================================================= */
+const FACTS_CACHE = new Map();
+
+async function openFacts(id) {
+  const meta = COUNTRIES[id];
+  if (!meta) return;
+  $("factsName").textContent = meta.name;
+  $("factsRegion").textContent = meta.region;
+  $("factsCapital").textContent = meta.capital;
+  // Reset dynamic fields
+  ["factsPopulation","factsLanguages","factsSubregion","factsDemonym"].forEach(f => {
+    const el = $(f); el.textContent = "loading…"; el.classList.add("loading");
+  });
+  const flag = $("factsFlag");
+  const url = flagUrl(id, "w320");
+  if (url) flag.src = url; else flag.removeAttribute("src");
+  $("factsModal").classList.add("show");
+
+  // Load from cache or REST Countries API
+  let data = FACTS_CACHE.get(id);
+  if (!data) {
+    const a2 = ISO_A2[id];
+    if (a2) {
+      try {
+        const r = await fetch(`https://restcountries.com/v3.1/alpha/${a2}?fields=name,population,languages,subregion,demonyms`);
+        if (r.ok) {
+          const arr = await r.json();
+          data = Array.isArray(arr) ? arr[0] : arr;
+          FACTS_CACHE.set(id, data);
+        }
+      } catch (e) { /* offline — fall through */ }
+    }
+  }
+  if (!data) {
+    ["factsPopulation","factsLanguages","factsSubregion","factsDemonym"].forEach(f => {
+      const el = $(f); el.textContent = "(offline)"; el.classList.add("loading");
+    });
+    return;
+  }
+  const pop = data.population;
+  const langs = data.languages ? Object.values(data.languages).join(", ") : "—";
+  const sub = data.subregion || "—";
+  const demo = (data.demonyms && (data.demonyms.eng && (data.demonyms.eng.m || data.demonyms.eng.f))) || "—";
+  const set = (id, val) => {
+    const el = $(id); el.textContent = val; el.classList.remove("loading");
+  };
+  set("factsPopulation", pop != null ? pop.toLocaleString() : "—");
+  set("factsLanguages", langs);
+  set("factsSubregion", sub);
+  set("factsDemonym", demo);
+}
+
+function closeFacts() { $("factsModal").classList.remove("show"); }
+
+/* =========================================================================
+   BRITISH VOICE NARRATION (Web Speech API)
+   ========================================================================= */
+let _voicesCache = null;
+function getVoices() {
+  if (_voicesCache && _voicesCache.length) return _voicesCache;
+  if ("speechSynthesis" in window) {
+    _voicesCache = window.speechSynthesis.getVoices();
+  }
+  return _voicesCache || [];
+}
+if ("speechSynthesis" in window) {
+  window.speechSynthesis.onvoiceschanged = () => { _voicesCache = window.speechSynthesis.getVoices(); };
+}
+
+function pickBritishVoice() {
+  const voices = getVoices();
+  if (!voices.length) return null;
+  // Preferred names across macOS/Windows/Chrome that are female British English
+  const preferredNames = /(Kate|Serena|Daniel|Karen|Martha|Moira|Siri|Fiona|Stephanie|Susan|Amelia|Google UK English Female|Microsoft Libby|Microsoft Sonia|Microsoft Hazel)/i;
+  const gbFemale = voices.find(v => /en.?GB/i.test(v.lang) && preferredNames.test(v.name) && /female|woman/i.test(v.name + " " + (v.voiceURI || "")));
+  const gbPreferred = voices.find(v => /en.?GB/i.test(v.lang) && preferredNames.test(v.name));
+  const anyGB = voices.find(v => /en.?GB/i.test(v.lang));
+  const anyEn = voices.find(v => /^en/i.test(v.lang));
+  return gbFemale || gbPreferred || anyGB || anyEn || voices[0] || null;
+}
+
+function speakBritish(text) {
+  if (Audio.muted) return;
+  if (!("speechSynthesis" in window)) return;
+  try { window.speechSynthesis.cancel(); } catch(e) {}
+  const utter = new SpeechSynthesisUtterance(text);
+  const v = pickBritishVoice();
+  if (v) { utter.voice = v; utter.lang = v.lang; } else { utter.lang = "en-GB"; }
+  utter.rate = 0.95;
+  utter.pitch = 1.05;
+  utter.volume = 0.9;
+  try { window.speechSynthesis.speak(utter); } catch(e) {}
 }
 
 function updateLevelBadge() {
@@ -1730,6 +2016,7 @@ function resetGame(toLevel) {
   applyAllHistoryClasses(); // will clear since map is empty
   // Also explicitly remove any persisted classes
   gMap.selectAll("path.country").classed("hist-correct", false).classed("hist-partial", false).classed("hist-revealed", false);
+  hidePromptFlag();
   $("victory").classList.remove("show");
   $("welcome").classList.remove("show");
   rebuildPool();
@@ -1946,6 +2233,9 @@ function wire() {
     await audioInit();
     toggleMute();
   });
+  $("flagBtn").addEventListener("click", toggleFlagMode);
+  $("factsClose").addEventListener("click", closeFacts);
+  $("factsModal").addEventListener("click", (e) => { if (e.target.id === "factsModal") closeFacts(); });
   $("zoomIn").addEventListener("click", () => svg.transition().call(zoomBehavior.scaleBy, 1.5));
   $("zoomOut").addEventListener("click", () => svg.transition().call(zoomBehavior.scaleBy, 1/1.5));
   $("zoomReset").addEventListener("click", () => svg.transition().call(zoomBehavior.transform, d3.zoomIdentity));
@@ -1955,9 +2245,11 @@ function wire() {
   });
 
   document.addEventListener("keydown", (e) => {
-    // Escape closes study modal
+    // Escape closes modals
+    if (e.key === "Escape" && $("factsModal").classList.contains("show")) { closeFacts(); return; }
     if (e.key === "Escape" && $("studyModal").classList.contains("show")) { closeStudy(); return; }
-    // Ignore space handling when study modal is open
+    // Ignore space handling when any modal is open
+    if ($("factsModal").classList.contains("show")) return;
     if ($("studyModal").classList.contains("show")) return;
     // Ignore if welcome overlay is up
     if ($("welcome").classList.contains("show")) return;
@@ -2038,8 +2330,11 @@ async function load() {
   initSpeech();
   buildStudyModal();
   updateLevelBadge();
+  updateFlagModeUI();
   wire();
   updateStats();
+  // Kick off voices list (speech synthesis)
+  if ("speechSynthesis" in window) { try { window.speechSynthesis.getVoices(); } catch(e) {} }
   $("welcome").classList.add("show");
 }
 
