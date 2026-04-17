@@ -2662,27 +2662,32 @@ function initSpeech() {
   const rec = new SR();
   rec.lang = "en-US";
   rec.interimResults = true;
-  rec.continuous = false;
+  // Continuous mode keeps the mic session alive across phrases so iOS
+  // stops re-prompting the user with the "Microphone access allowed" pill.
+  rec.continuous = true;
   rec.maxAlternatives = 3;
 
   rec.onresult = (ev) => {
     let transcript = "";
+    // Only collect text from the latest recognition segment — otherwise old
+    // transcripts pile up across phrases when continuous:true.
     for (let i = ev.resultIndex; i < ev.results.length; i++) {
       transcript += ev.results[i][0].transcript;
     }
     $("answerInput").value = transcript.trim();
     if (ev.results[ev.results.length - 1].isFinal) {
-      try { rec.stop(); } catch(e) {}
+      // Submit without stopping recognition — the session stays open for the
+      // next phrase, avoiding another iOS permission reminder.
       setTimeout(submitAnswer, 80);
     }
   };
   rec.onend = () => {
     state.listening = false;
     $("micBtn").classList.remove("listening");
+    // Only restart if recognition ended unexpectedly AND we still want to listen.
     if (state.voiceMode) {
-      // restart if still in a question stage
       if (state.stage === STAGE.COUNTRY || state.stage === STAGE.CAPITAL) {
-        restartListeningSoon(250);
+        restartListeningSoon(400);
       }
     }
   };
@@ -2889,21 +2894,30 @@ function wire() {
       document.getElementById("welcomeGreeting").textContent = `Welcome, ${n}`;
     });
   }
-  $("startBtn").addEventListener("click", async () => {
+  $("startBtn").addEventListener("click", () => {
     const nm = $("nameInput") && $("nameInput").value.trim();
     if (nm) setPlayerName(nm); else applyPlayerName();
-    await audioInit();
     const greet = nm || getPlayerName();
-    $("welcome").classList.remove("show");
-    startAmbient(state.level);
+    // iOS Safari requires speechSynthesis.speak() to be invoked directly
+    // inside the user gesture — any awaited promise before it breaks the
+    // gesture chain and silences the voice. Speak first, defer audio init.
     state.suppressListening = true;
-    speakBritish(`Hello ${greet}, let's explore.`, () => {
+    const releaseListening = () => {
+      if (!state.suppressListening) return;
       state.suppressListening = false;
       if (state.voiceMode && (state.stage === STAGE.COUNTRY || state.stage === STAGE.CAPITAL)) {
         startListening();
       }
-    });
+    };
+    // Fallback in case speech never finishes / fires onend (iOS quirk)
+    setTimeout(releaseListening, 2800);
+    speakBritish(`Hello ${greet}, let's explore.`, releaseListening);
+    $("welcome").classList.remove("show");
     pickNext();
+    (async () => {
+      try { await audioInit(); } catch(e) {}
+      startAmbient(state.level);
+    })();
   });
   $("playAgainBtn").addEventListener("click", async () => {
     await audioInit();
