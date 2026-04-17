@@ -866,38 +866,65 @@
     font-style: italic;
   }
 
+  /* ===== MOBILE LAYOUT ===== */
   @media (max-width: 760px) {
-    /* Compact top HUD so map gets vertical space */
+    /* Compact title — single line, top-left */
     .hud-title {
-      top: 8px; left: 8px; padding: 6px 10px; max-width: 170px;
+      top: 6px; left: 6px; padding: 5px 10px; max-width: 60vw;
     }
-    .hud-title h1 { font-size: 1rem; letter-spacing: 0.01em; }
+    .hud-title h1 { font-size: 0.95rem; letter-spacing: 0.01em; }
     .hud-title .subtitle { display: none; }
-    .hud-title .level-badge { margin-top: 4px; padding-top: 4px; }
-    .hud-title .level-badge .lvl-num { font-size: 0.65rem; }
-    .hud-title .level-badge .lvl-name { font-size: 0.85rem; }
-
-    .hud-score {
-      top: 8px; right: 8px; padding: 5px 8px; gap: 8px;
+    .hud-title .level-badge {
+      margin-top: 3px; padding-top: 3px;
+      border-top: 1px solid var(--line-soft);
     }
-    .hud-score .stat { min-width: 38px; }
-    .hud-score .label { font-size: 0.52rem; letter-spacing: 0.15em; }
-    .hud-score .value { font-size: 0.95rem; }
+    .hud-title .level-badge .lvl-num { font-size: 0.6rem; }
+    .hud-title .level-badge .lvl-name { font-size: 0.78rem; }
+
+    /* Compact score */
+    .hud-score {
+      top: 6px; right: 6px; padding: 4px 8px; gap: 8px;
+    }
+    .hud-score .stat { min-width: 32px; }
+    .hud-score .label { font-size: 0.5rem; letter-spacing: 0.12em; }
+    .hud-score .value { font-size: 0.85rem; }
     .hud-score .sep { display: none; }
 
+    /* Toolbar: hidden by default so it doesn't block the map.
+       Users can expand via the ⋯ menu button. */
     .hud-toolbar {
-      top: 80px; right: 8px; padding: 5px; gap: 4px;
-      flex-wrap: wrap; max-width: 200px; justify-content: flex-end;
+      display: none;
+      top: auto; bottom: 72px; right: 6px;
+      padding: 5px; gap: 4px;
+      flex-wrap: wrap; max-width: calc(100vw - 14px); justify-content: flex-end;
     }
+    body.mobile-menu-open .hud-toolbar { display: flex; }
     .tbtn { font-size: 0.72rem; padding: 5px 8px; }
     .tbtn svg { width: 12px; height: 12px; }
 
-    /* Prompt card — semi-transparent, compact, at the bottom */
+    /* A small ⋯ toggle so users can still access the toolbar */
+    .mobile-menu-btn {
+      position: fixed; top: 52px; right: 6px;
+      width: 32px; height: 28px;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--navy);
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1rem; line-height: 1;
+      z-index: 11;
+    }
+
+    /* Prompt card — compact, anchored to edges via left/right, not width */
     .hud-prompt {
+      box-sizing: border-box;
+      left: 6px; right: 6px;
       bottom: 6px;
-      width: calc(100vw - 14px);
+      width: auto;
+      transform: none;
       padding: 8px 12px 10px 12px;
-      background: rgba(247,245,241,0.88);
+      background: rgba(247,245,241,0.92);
       backdrop-filter: blur(6px);
       -webkit-backdrop-filter: blur(6px);
       box-shadow: 0 2px 10px rgba(30,58,95,0.10);
@@ -905,19 +932,23 @@
     .prompt-row { margin-bottom: 6px; gap: 1px; }
     .prompt-eyebrow { font-size: 0.56rem; letter-spacing: 0.2em; }
     .prompt-question { font-size: 1rem; line-height: 1.15; }
-    .prompt-sub { font-size: 0.7rem; min-height: 0; }
-    input[type="text"] { padding: 8px 10px; font-size: 0.95rem; }
+    .prompt-sub { font-size: 0.7rem; min-height: 0; display: none; }
+    .input-row { gap: 6px; }
+    input[type="text"] {
+      padding: 8px 10px; font-size: 0.95rem;
+      box-sizing: border-box;
+    }
     button.icon { width: 38px; }
     button.primary { padding: 0 12px; font-size: 0.85rem; }
-    .feedback { margin-top: 6px; font-size: 0.8rem; min-height: 16px; }
-    .tries { margin-top: 4px; font-size: 0.6rem; letter-spacing: 0.15em; }
+    .feedback { margin-top: 6px; font-size: 0.78rem; min-height: 14px; }
+    .tries { margin-top: 4px; font-size: 0.58rem; letter-spacing: 0.15em; }
     .tries .dots { gap: 4px; }
     .tries .dots span { width: 6px; height: 6px; }
-    .prompt-flag { top: 6px; right: 8px; width: 36px; }
+    .prompt-flag { top: 6px; right: 8px; width: 34px; }
 
     /* Zoom controls — smaller, tucked in */
-    .zoom-controls { bottom: auto; top: 50%; right: 4px; transform: translateY(-50%); }
-    .zoom-controls button { width: 32px; height: 32px; font-size: 0.9rem; }
+    .zoom { bottom: auto; top: 86px; right: 6px; flex-direction: row; gap: 3px; }
+    .zoom button { width: 28px; height: 28px; font-size: 0.9rem; }
 
     /* Hide footer credit — no room */
     .hud-footer { display: none; }
@@ -931,29 +962,23 @@
     .name-field label { font-size: 0.85rem; }
     .name-field input[type="text"] { padding: 8px 10px; font-size: 0.9rem; }
   }
+  /* Hide mobile-only menu button on desktop */
+  @media (min-width: 761px) {
+    .mobile-menu-btn { display: none; }
+  }
 
-  /* Portrait mobile — show the map in landscape orientation as a visual
-     cue for the user to rotate the device. HUD stays in normal orientation. */
+  /* Gentle rotate-phone hint on portrait mobile — no actual map rotation */
   @media (max-width: 760px) and (orientation: portrait) {
-    #mapWrap {
-      top: 0;
-      left: 100vw;
-      width: 100vh;
-      height: 100vw;
-      transform-origin: top left;
-      transform: rotate(90deg);
-    }
-    /* A subtle hint in the center telling the user to rotate. */
     .rotate-hint {
       position: fixed;
       top: 50%; left: 50%;
       transform: translate(-50%, -50%);
       background: rgba(30,58,95,0.82);
       color: var(--cream);
-      padding: 10px 16px;
+      padding: 8px 14px;
       border-radius: 22px;
       font-family: var(--font-body);
-      font-size: 0.8rem;
+      font-size: 0.72rem;
       letter-spacing: 0.08em;
       display: flex; align-items: center; gap: 8px;
       box-shadow: 0 4px 14px rgba(0,0,0,0.18);
@@ -961,7 +986,7 @@
       z-index: 30;
       animation: rotateHintPulse 2.4s ease-in-out infinite;
     }
-    .rotate-hint svg { width: 18px; height: 18px; }
+    .rotate-hint svg { width: 16px; height: 16px; }
   }
   @media (min-width: 761px), (orientation: landscape) {
     .rotate-hint { display: none; }
@@ -971,8 +996,9 @@
     50% { opacity: 0.55; }
   }
 
-  /* Voice mode on small screens: hide the prompt card chrome entirely,
-     leave only a transparent, compact input floating at the bottom. */
+  /* Voice mode on small screens: dissolve the prompt card chrome,
+     leave only a transparent input at the bottom. The instruction
+     is shown as the input placeholder (set by JS). */
   @media (max-width: 760px) {
     body.voice-mode-mobile .hud-prompt {
       background: transparent;
@@ -980,18 +1006,22 @@
       -webkit-backdrop-filter: none;
       box-shadow: none;
       border: none;
-      padding: 4px 8px;
+      padding: 4px 6px;
     }
-    body.voice-mode-mobile .prompt-row { display: none; }
+    body.voice-mode-mobile .prompt-row,
     body.voice-mode-mobile .feedback,
-    body.voice-mode-mobile .tries { display: none; }
+    body.voice-mode-mobile .tries,
     body.voice-mode-mobile .prompt-flag { display: none; }
     body.voice-mode-mobile input[type="text"] {
-      background: rgba(250,248,245,0.55);
+      background: rgba(250,248,245,0.72);
       backdrop-filter: blur(4px);
       -webkit-backdrop-filter: blur(4px);
       border-color: rgba(194,123,92,0.55);
-      font-size: 0.9rem;
+      font-size: 0.92rem;
+      text-align: center;
+    }
+    body.voice-mode-mobile input[type="text"]::placeholder {
+      color: var(--navy); font-style: normal; opacity: 0.75;
     }
     body.voice-mode-mobile .hud-prompt button.primary { display: none; }
   }
@@ -1028,6 +1058,8 @@
   <div class="sep"></div>
   <div class="stat"><span class="label">Best</span><span class="value" id="best">0</span></div>
 </section>
+
+<button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Toggle menu">⋯</button>
 
 <section class="hud hud-toolbar">
   <button class="tbtn" id="studyBtn" title="Study mode — browse all countries & capitals">
@@ -2160,7 +2192,7 @@ function pickNext() {
   }
   $("promptSub").textContent = "";
   $("answerInput").value = "";
-  $("answerInput").placeholder = isOcean ? "Type the ocean…" : "Type the country…";
+  updateInputPlaceholder();
   $("answerInput").disabled = false;
   $("submitBtn").disabled = false;
   $("submitBtn").textContent = "Submit";
@@ -2263,7 +2295,7 @@ function beginCapitalStage(meta) {
   $("promptQuestion").textContent = `Capital of ${meta.name}?`;
   $("promptSub").textContent = "Or press Space to skip to the next country";
   $("answerInput").value = "";
-  $("answerInput").placeholder = "Type the capital…";
+  updateInputPlaceholder();
   updateSuggestions();
   setTimeout(() => $("answerInput").focus(), 40);
   if (state.voiceMode) restartListeningSoon();
@@ -2675,7 +2707,7 @@ function startListening() {
     state.recognition.start();
     state.listening = true;
     $("micBtn").classList.add("listening");
-    $("answerInput").placeholder = "Listening… speak your answer";
+    updateInputPlaceholder();
   } catch (e) { /* already started */ }
 }
 
@@ -2708,13 +2740,35 @@ function toggleVoiceMode() {
     startListening();
   } else {
     stopListening();
-    $("answerInput").placeholder = state.stage === STAGE.CAPITAL ? "Type the capital…" : "Type the country…";
     updateSuggestions();
   }
+  updateInputPlaceholder();
 }
 
 function applyVoiceModeClass() {
   document.body.classList.toggle("voice-mode-mobile", !!state.voiceMode);
+}
+
+function updateInputPlaceholder() {
+  const input = $("answerInput");
+  if (!input) return;
+  const meta = state.currentId ? COUNTRIES[state.currentId] : null;
+  if (state.voiceMode) {
+    if (state.stage === STAGE.CAPITAL && meta) {
+      input.placeholder = `Capital of ${meta.name}?`;
+    } else if (state.stage === STAGE.COUNTRY && meta) {
+      input.placeholder = meta && meta.ocean ? "Which ocean is highlighted?" : "Which country is highlighted?";
+    } else {
+      input.placeholder = "Speak your answer…";
+    }
+  } else {
+    if (state.stage === STAGE.CAPITAL) {
+      input.placeholder = "Type the capital…";
+    } else {
+      const isOcean = meta && meta.ocean;
+      input.placeholder = isOcean ? "Type the ocean…" : "Type the country…";
+    }
+  }
 }
 
 /* =========================================================================
@@ -2791,6 +2845,12 @@ function setStudyMode(mode) {
 function wire() {
   $("submitBtn").addEventListener("click", submitAnswer);
   $("micBtn").addEventListener("click", toggleVoiceMode);
+  const menuBtn = document.getElementById("mobileMenuBtn");
+  if (menuBtn) {
+    menuBtn.addEventListener("click", () => {
+      document.body.classList.toggle("mobile-menu-open");
+    });
+  }
   $("levelSelect").addEventListener("change", (e) => jumpToLevel(Number(e.target.value)));
   $("regionSelect").addEventListener("change", (e) => {
     state.regionFilter = e.target.value;
@@ -2927,7 +2987,8 @@ function wire() {
     }
   });
 
-  window.addEventListener("resize", () => {
+  let _resizeTimer = null;
+  const doResize = () => {
     setupMap();
     renderCountries();
     if (state.currentId) {
@@ -2936,6 +2997,16 @@ function wire() {
         gMap.selectAll("path.country").filter(d => d.id === state.currentId).classed("revealed", true);
       }
     }
+  };
+  const scheduleResize = () => {
+    clearTimeout(_resizeTimer);
+    _resizeTimer = setTimeout(doResize, 150);
+  };
+  window.addEventListener("resize", scheduleResize);
+  // iOS Safari sometimes doesn't fire resize after rotation; handle explicitly.
+  window.addEventListener("orientationchange", () => {
+    // Re-run after the browser settles the new viewport dimensions.
+    setTimeout(doResize, 300);
   });
 }
 
