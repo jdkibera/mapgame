@@ -2012,21 +2012,67 @@ function levenshtein(a, b) {
   }
   return dp[al][bl];
 }
-function matchAny(input, candidates) {
+// A crude phonetic sketch: collapse vowels, fold likely-confused consonant
+// sounds. Lets "bern" match "burn", "france" match "fronts", etc.
+function phonetic(s) {
+  return normalize(s)
+    .replace(/[aeiou]+/g, "a")              // vowels all equal
+    .replace(/ph/g, "f")
+    .replace(/ck/g, "k").replace(/c([eiy])/g, "s$1").replace(/c/g, "k")
+    .replace(/qu/g, "kw").replace(/q/g, "k")
+    .replace(/x/g, "ks")
+    .replace(/(.)\1+/g, "$1");              // collapse doubles
+}
+function matchAny(input, candidates, opts) {
+  const loose = !!(opts && opts.loose);
   const u = normalize(input);
   if (!u) return false;
   const cands = candidates.map(normalize);
   if (cands.includes(u)) return true;
-  return cands.some(c => {
-    if (c.length >= 9) return levenshtein(u, c) <= 2;
-    if (c.length >= 5) return levenshtein(u, c) <= 1;
+  // Levenshtein fuzzy — a bit more forgiving under loose (voice) mode.
+  const hitFuzzy = cands.some(c => {
+    const d = levenshtein(u, c);
+    if (loose) {
+      if (c.length >= 8) return d <= 3;
+      if (c.length >= 5) return d <= 2;
+      if (c.length >= 4) return d <= 1;   // "Bern" vs "burn"
+      return false;
+    }
+    if (c.length >= 9) return d <= 2;
+    if (c.length >= 5) return d <= 1;
     return false;
   });
+  if (hitFuzzy) return true;
+  // Phonetic comparison (voice only) — matches homophone-ish misrecognitions.
+  if (loose) {
+    const up = phonetic(u);
+    return cands.some(c => {
+      const cp = phonetic(c);
+      if (up === cp) return true;
+      if (cp.length >= 5) return levenshtein(up, cp) <= 2;
+      return levenshtein(up, cp) <= 1;
+    });
+  }
+  return false;
 }
-function matchesCountry(input, meta) { return matchAny(input, [meta.name, ...(meta.alt || [])]); }
-function matchesCapital(input, meta) {
+function matchesCountry(input, meta, opts) { return matchAny(input, [meta.name, ...(meta.alt || [])], opts); }
+function matchesCapital(input, meta, opts) {
   const caps = [meta.capital, ...(meta.alt || [])];
-  return matchAny(input, caps);
+  return matchAny(input, caps, opts);
+}
+// Voice input is inherently noisier than typing — check any alternative
+// transcription the recognizer suggested, and relax the match thresholds.
+function matchesCountryAny(meta) {
+  const input = $("answerInput").value;
+  if (matchesCountry(input, meta)) return true;
+  const alts = state.voiceAlternatives || [];
+  return alts.some(a => matchesCountry(a, meta, { loose: true }));
+}
+function matchesCapitalAny(meta) {
+  const input = $("answerInput").value;
+  if (matchesCapital(input, meta)) return true;
+  const alts = state.voiceAlternatives || [];
+  return alts.some(a => matchesCapital(a, meta, { loose: true }));
 }
 
 /* =========================================================================
@@ -2232,7 +2278,7 @@ function submitAnswer() {
   if (!meta) return;
 
   if (state.stage === STAGE.COUNTRY) {
-    if (matchesCountry(input, meta)) {
+    if (matchesCountryAny(meta)) {
       const pts = pointsForTries(state.tries);
       state.score += pts;
       if (state.tries === 0) state.streak += 1; else state.streak = 0;
@@ -2274,7 +2320,7 @@ function submitAnswer() {
       }
     }
   } else if (state.stage === STAGE.CAPITAL) {
-    if (matchesCapital(input, meta)) {
+    if (matchesCapitalAny(meta)) {
       const bonus = bonusForTries(state.tries);
       state.score += bonus;
       showFeedback("correct", `✓ ${meta.capital}. Bonus +${bonus}`);
@@ -2680,16 +2726,27 @@ function initSpeech() {
 
   rec.onresult = (ev) => {
     let transcript = "";
+    let alternatives = [];
     // Only collect text from the latest recognition segment — otherwise old
     // transcripts pile up across phrases when continuous:true.
     for (let i = ev.resultIndex; i < ev.results.length; i++) {
       transcript += ev.results[i][0].transcript;
+      if (ev.results[i].isFinal) {
+        // Capture every alternative for the final result — the recognizer's
+        // top pick is often wrong on homophones ("friends"/"France",
+        // "burn"/"Bern") but a lower-ranked alternative is usually correct.
+        for (let a = 0; a < ev.results[i].length; a++) {
+          alternatives.push(ev.results[i][a].transcript);
+        }
+      }
     }
     $("answerInput").value = transcript.trim();
     if (ev.results[ev.results.length - 1].isFinal) {
-      // Submit without stopping recognition — the session stays open for the
-      // next phrase, avoiding another iOS permission reminder.
-      setTimeout(submitAnswer, 80);
+      state.voiceAlternatives = alternatives;
+      setTimeout(() => {
+        submitAnswer();
+        state.voiceAlternatives = null;
+      }, 80);
     }
   };
   rec.onend = () => {
