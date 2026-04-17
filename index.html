@@ -1759,8 +1759,16 @@ const tooltip = $("tooltip");
 let projection, pathGen, gMap, gGrat, zoomBehavior, rootG;
 
 function setupMap() {
+  // Use window inner dimensions as the source of truth. iOS Safari's
+  // getBoundingClientRect on the SVG can be stale right after a rotation
+  // or when the URL bar collapses/expands.
   const rect = svg.node().getBoundingClientRect();
-  const w = rect.width, h = rect.height;
+  const w = Math.max(rect.width, window.innerWidth) || window.innerWidth;
+  const h = Math.max(rect.height, window.innerHeight) || window.innerHeight;
+  // Force the SVG element's viewBox so the projection maths match what
+  // the user actually sees even if CSS sizing hasn't settled.
+  svg.attr("viewBox", `0 0 ${w} ${h}`)
+     .attr("preserveAspectRatio", "xMidYMid meet");
   projection = d3.geoNaturalEarth1()
     .scale(w / 6.1)
     .translate([w / 2, h / 2]);
@@ -1816,6 +1824,9 @@ function setupMap() {
       });
     });
   svg.call(zoomBehavior);
+  // Reset any lingering zoom transform from the previous viewport so the
+  // map starts at identity after a rotation / resize.
+  svg.call(zoomBehavior.transform, d3.zoomIdentity);
 }
 
 function renderCountries() {
@@ -3012,16 +3023,22 @@ function wire() {
       }
     }
   };
-  const scheduleResize = () => {
+  const scheduleResize = (delay = 150) => {
     clearTimeout(_resizeTimer);
-    _resizeTimer = setTimeout(doResize, 150);
+    _resizeTimer = setTimeout(doResize, delay);
   };
-  window.addEventListener("resize", scheduleResize);
-  // iOS Safari sometimes doesn't fire resize after rotation; handle explicitly.
+  window.addEventListener("resize", () => scheduleResize(150));
+  // iOS Safari: viewport size stabilizes late after rotation. Run the
+  // resize once quickly and again after the URL bar settles.
   window.addEventListener("orientationchange", () => {
-    // Re-run after the browser settles the new viewport dimensions.
-    setTimeout(doResize, 300);
+    scheduleResize(250);
+    setTimeout(doResize, 700);
   });
+  // visualViewport tracks the *actual* visible area (below the URL bar).
+  // Watching it catches the moment the URL bar auto-hides on scroll.
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", () => scheduleResize(200));
+  }
 }
 
 /* =========================================================================
