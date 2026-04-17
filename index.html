@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>World Explorer — A Map Game</title>
+<title>Tallulah the Explorer — A Map Game</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,300;1,8..60,400&family=IM+Fell+English+SC&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
@@ -172,6 +172,25 @@
   .tbtn:hover { border-color: var(--copper-light); color: var(--copper); }
   .tbtn svg { width: 14px; height: 14px; }
   .tbtn.danger:hover { color: var(--bad); border-color: var(--bad-soft); }
+  .tbtn.muted { color: var(--text-light); }
+  .tbtn.muted .sound-on { display: none; }
+  .tbtn.muted .sound-off { display: inline-block !important; }
+
+  .hud-footer {
+    bottom: 6px; left: 50%;
+    transform: translateX(-50%);
+    padding: 3px 12px;
+    font-family: var(--font-heading);
+    font-style: italic;
+    font-size: 0.72rem;
+    letter-spacing: 0.18em;
+    color: var(--text-light);
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    pointer-events: none;
+    z-index: 5;
+  }
   .tbtn select {
     background: transparent; border: none; color: inherit;
     font-family: inherit; font-size: inherit;
@@ -525,6 +544,70 @@
     padding: 16px 24px 24px 24px;
     overflow-y: auto;
   }
+  .study-tabs {
+    display: inline-flex; gap: 0;
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--cream);
+  }
+  .study-tab {
+    background: transparent;
+    border: none;
+    color: var(--text-med);
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    padding: 7px 14px;
+    cursor: pointer;
+    letter-spacing: 0.05em;
+  }
+  .study-tab.active {
+    background: var(--navy);
+    color: var(--cream);
+  }
+  .study-map-hint {
+    display: none;
+    padding: 14px 24px 18px 24px;
+    text-align: center;
+    font-style: italic;
+    font-family: var(--font-heading);
+    color: var(--text-med);
+    font-size: 0.95rem;
+    border-top: 1px solid var(--line-soft);
+  }
+  /* Map-mode: collapse modal to a corner panel so the map is fully explorable */
+  .modal.map-mode {
+    background: transparent;
+    pointer-events: none;
+    backdrop-filter: none;
+  }
+  .modal.map-mode .modal-card {
+    position: fixed;
+    top: 16px; right: 16px;
+    margin: 0;
+    width: auto;
+    max-width: 340px;
+    align-self: auto;
+    max-height: none;
+    height: auto;
+    pointer-events: auto;
+  }
+  .modal.map-mode .modal-head {
+    padding: 12px 16px;
+    gap: 8px;
+  }
+  .modal.map-mode .modal-head h3 {
+    font-size: 1.1rem;
+  }
+  .modal.map-mode .modal-head .sub { display: none; }
+  .modal.map-mode #studyBody { display: none; }
+  .modal.map-mode #studySearch { display: none; }
+  .modal.map-mode .study-map-hint {
+    display: block;
+    padding: 10px 16px 14px 16px;
+    font-size: 0.85rem;
+    border-top: 1px solid var(--line-soft);
+  }
   .tier-section { margin-bottom: 22px; }
   .tier-section h4 {
     margin: 0 0 10px 0;
@@ -592,10 +675,10 @@
 <div class="tooltip" id="tooltip"></div>
 
 <header class="hud hud-title">
-  <h1>World Explorer</h1>
+  <h1>Tallulah the Explorer</h1>
   <div class="subtitle">A Cartographer's Quiz</div>
   <div class="level-badge">
-    <span class="lvl-num" id="levelNum">Lv. I</span>
+    <span class="lvl-num" id="levelNum">Level I</span>
     <span class="lvl-name" id="levelName">Home Waters</span>
   </div>
 </header>
@@ -618,18 +701,25 @@
   <button class="tbtn" id="jumpBtn" title="Jump to level">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15 8 22 9 17 14 18 21 12 18 6 21 7 14 2 9 9 8 12 2"/></svg>
     <select id="levelSelect" title="Jump to level">
-      <option value="1">Lv I — Home Waters</option>
-      <option value="2">Lv II — Foreign Shores</option>
-      <option value="3">Lv III — Uncharted Seas</option>
-      <option value="4">Lv IV — Terra Incognita</option>
-      <option value="5">Lv V — Edge of the World</option>
+      <option value="1">Level I — Home Waters</option>
+      <option value="2">Level II — Foreign Shores</option>
+      <option value="3">Level III — Uncharted Seas</option>
+      <option value="4">Level IV — Terra Incognita</option>
+      <option value="5">Level V — Edge of the World</option>
     </select>
+  </button>
+  <button class="tbtn" id="soundBtn" title="Toggle sound">
+    <svg class="sound-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+    <svg class="sound-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+    <span class="label">Sound</span>
   </button>
   <button class="tbtn danger" id="resetBtn" title="Reset the entire game">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
     Reset
   </button>
 </section>
+
+<footer class="hud hud-footer">© Kibera LLC</footer>
 
 <section class="hud hud-prompt">
   <div class="prompt-row">
@@ -671,11 +761,13 @@
 <div class="overlay" id="welcome">
   <div class="card">
     <div class="flourish">— A Cartographer's Quiz —</div>
-    <h2>Welcome, Explorer</h2>
+    <h2>Welcome, Tallulah</h2>
     <p>A country will be highlighted on the map. Name it — and for a bonus, name its capital. Three tries before it's revealed.</p>
     <p style="font-size:0.85rem;">Progress through five levels, from <em>Home Waters</em> to the <em>Edge of the World</em>. Use <span class="kbd">Space</span> to advance, <span class="kbd">Enter</span> to submit, and the <strong>🎤</strong> to switch to voice mode (stays on).</p>
-    <button class="primary" id="startBtn" style="padding:10px 24px; font-size:1rem;">Begin Voyage</button>
-    <a class="secondary-link" id="studyFromWelcome">Browse all countries first →</a>
+    <div style="display:flex; flex-direction:column; align-items:center; gap:10px;">
+      <button class="primary" id="startBtn" style="padding:10px 24px; font-size:1rem;">Begin Voyage</button>
+      <a class="secondary-link" id="studyFromWelcome">Browse all countries first →</a>
+    </div>
   </div>
 </div>
 
@@ -704,16 +796,24 @@
         <h3>Study — Countries &amp; Capitals</h3>
         <div class="sub">Grouped by level · 198 nations</div>
       </div>
+      <div class="study-tabs" role="tablist">
+        <button class="study-tab active" data-study="list">List</button>
+        <button class="study-tab" data-study="map">Map</button>
+      </div>
       <input type="text" id="studySearch" placeholder="Search country or capital…" />
       <button class="modal-close" id="studyClose">Close</button>
     </div>
     <div class="modal-body" id="studyBody"></div>
+    <div class="study-map-hint" id="studyMapHint">
+      Hover any country on the map to see its name and capital. Click <strong>Close</strong> or press <span class="kbd">Esc</span> to return.
+    </div>
   </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
 <script>
 /* =========================================================================
    COUNTRY DATA — keyed by ISO 3166-1 numeric code (matches world-atlas ids)
@@ -1003,9 +1103,168 @@ let state = {
   level: 1,
   voiceMode: false,
   listening: false,
-  recognition: null
+  recognition: null,
+  studyMapMode: false,
 };
 try { state.best = Number(localStorage.getItem("we_best") || 0) || 0; } catch(e) { state.best = 0; }
+
+/* =========================================================================
+   AUDIO — ambient themes per level + sound effects (via Tone.js)
+   ========================================================================= */
+const Audio = {
+  ready: false,
+  muted: false,
+  synth: null,
+  pattern: null,
+  reverb: null,
+  masterGain: null,
+  currentLevel: 0,
+};
+try { Audio.muted = JSON.parse(localStorage.getItem("we_muted") || "false"); } catch(e) {}
+
+// Scales are chosen so each level has its own mood.
+// All use pentatonic/modal patterns to stay non-distracting.
+const LEVEL_SCALES = {
+  1: ["C4","E4","G4","A4","C5","E5","G5","A5"],        // C major pentatonic — warm, familiar
+  2: ["D4","F4","G4","A4","C5","D5","F5","A5"],        // D minor pentatonic — travel
+  3: ["G3","Bb3","C4","D4","F4","G4","Bb4","D5"],      // G minor pentatonic — oceanic
+  4: ["E3","G3","A3","B3","D4","E4","G4","B4"],        // E minor — mysterious
+  5: ["A3","C4","D4","F4","G4","A4","C5","F5"],        // A minor with exotic feel
+};
+const LEVEL_BPM = { 1: 58, 2: 54, 3: 52, 4: 50, 5: 48 };
+
+async function audioInit() {
+  if (Audio.ready) return;
+  if (typeof Tone === "undefined") return;
+  try { await Tone.start(); } catch(e) { return; }
+  Audio.masterGain = new Tone.Gain(0.75).toDestination();
+  Audio.reverb = new Tone.Reverb({ decay: 4, wet: 0.38 }).connect(Audio.masterGain);
+  Audio.synth = new Tone.PolySynth(Tone.FMSynth, {
+    harmonicity: 2.0,
+    modulationIndex: 3,
+    envelope: { attack: 0.9, decay: 0.5, sustain: 0.5, release: 2.6 },
+    modulation: { type: "sine" },
+    modulationEnvelope: { attack: 1.3, decay: 0.5, sustain: 0.4, release: 2.0 }
+  }).connect(Audio.reverb);
+  Audio.synth.volume.value = -24; // soft, ambient
+  Audio.ready = true;
+  updateMuteUI();
+}
+
+function startAmbient(level) {
+  if (!Audio.ready || !Audio.synth) return;
+  stopAmbient();
+  if (Audio.muted) return;
+  const notes = LEVEL_SCALES[level] || LEVEL_SCALES[1];
+  Tone.Transport.bpm.value = LEVEL_BPM[level] || 56;
+  Audio.pattern = new Tone.Pattern((time, note) => {
+    // Gentle velocity variation
+    const vel = 0.28 + Math.random() * 0.2;
+    Audio.synth.triggerAttackRelease(note, "2n", time, vel);
+  }, notes, "randomWalk");
+  Audio.pattern.interval = "2n";
+  Audio.pattern.start(0);
+  try { Tone.Transport.start(); } catch(e) {}
+  Audio.currentLevel = level;
+}
+
+function stopAmbient() {
+  if (Audio.pattern) {
+    try { Audio.pattern.stop(0); Audio.pattern.dispose(); } catch(e) {}
+    Audio.pattern = null;
+  }
+  try { Tone.Transport.stop(); } catch(e) {}
+}
+
+function playCorrectSfx() {
+  if (!Audio.ready || Audio.muted) return;
+  const synth = new Tone.PolySynth(Tone.Synth, {
+    envelope: { attack: 0.01, decay: 0.15, sustain: 0.25, release: 0.6 }
+  }).toDestination();
+  synth.volume.value = -12;
+  const t0 = Tone.now();
+  synth.triggerAttackRelease(["C5","E5","G5"], "16n", t0);
+  synth.triggerAttackRelease(["C6"], "8n", t0 + 0.16);
+  setTimeout(() => synth.dispose(), 1400);
+}
+
+function playWrongSfx() {
+  if (!Audio.ready || Audio.muted) return;
+  const synth = new Tone.Synth({
+    oscillator: { type: "sawtooth" },
+    envelope: { attack: 0.04, decay: 0.22, sustain: 0.22, release: 0.55 }
+  }).toDestination();
+  synth.volume.value = -16;
+  // Sad trombone — descending pitches with a slide feel
+  const t0 = Tone.now();
+  synth.triggerAttackRelease("F3", "8n", t0);
+  synth.triggerAttackRelease("Eb3", "8n", t0 + 0.22);
+  synth.triggerAttackRelease("D3", "8n", t0 + 0.44);
+  synth.triggerAttackRelease("C3", "4n", t0 + 0.66);
+  setTimeout(() => synth.dispose(), 1800);
+}
+
+function playRevealSfx() {
+  if (!Audio.ready || Audio.muted) return;
+  // A soft "aww" — two descending notes, less harsh than the full womp-womp
+  const synth = new Tone.Synth({
+    oscillator: { type: "sine" },
+    envelope: { attack: 0.08, decay: 0.3, sustain: 0.3, release: 0.7 }
+  }).toDestination();
+  synth.volume.value = -16;
+  const t0 = Tone.now();
+  synth.triggerAttackRelease("A3", "8n", t0);
+  synth.triggerAttackRelease("F3", "4n", t0 + 0.22);
+  setTimeout(() => synth.dispose(), 1400);
+}
+
+function playLevelUpSfx() {
+  if (!Audio.ready || Audio.muted) return;
+  const synth = new Tone.PolySynth(Tone.Synth, {
+    envelope: { attack: 0.015, decay: 0.2, sustain: 0.3, release: 0.9 }
+  }).toDestination();
+  synth.volume.value = -10;
+  const t0 = Tone.now();
+  // Triumphant ascending fanfare
+  synth.triggerAttackRelease(["C4","E4","G4"], "16n", t0);
+  synth.triggerAttackRelease(["E4","G4","C5"], "16n", t0 + 0.18);
+  synth.triggerAttackRelease(["G4","C5","E5"], "8n", t0 + 0.36);
+  synth.triggerAttackRelease(["C5","E5","G5","C6"], "4n", t0 + 0.62);
+  setTimeout(() => synth.dispose(), 2600);
+}
+
+function playVictorySfx() {
+  if (!Audio.ready || Audio.muted) return;
+  const synth = new Tone.PolySynth(Tone.Synth, {
+    envelope: { attack: 0.02, decay: 0.3, sustain: 0.35, release: 1.2 }
+  }).toDestination();
+  synth.volume.value = -8;
+  const t0 = Tone.now();
+  const notes = ["C4","E4","G4","C5","E5","G5","C6"];
+  notes.forEach((n, i) => synth.triggerAttackRelease(n, "8n", t0 + i * 0.12));
+  synth.triggerAttackRelease(["C5","E5","G5","C6"], "2n", t0 + 0.9);
+  setTimeout(() => synth.dispose(), 3200);
+}
+
+function toggleMute() {
+  Audio.muted = !Audio.muted;
+  try { localStorage.setItem("we_muted", JSON.stringify(Audio.muted)); } catch(e) {}
+  if (Audio.muted) {
+    stopAmbient();
+  } else if (Audio.ready) {
+    startAmbient(state.level);
+  }
+  updateMuteUI();
+}
+
+function updateMuteUI() {
+  const btn = $("soundBtn");
+  if (!btn) return;
+  btn.classList.toggle("muted", Audio.muted);
+  const label = btn.querySelector(".label");
+  if (label) label.textContent = Audio.muted ? "Muted" : "Sound";
+}
+
 
 /* =========================================================================
    DOM SHORTCUTS
@@ -1051,10 +1310,16 @@ function renderCountries() {
     .attr("class", "country")
     .attr("d", pathGen)
     .on("mousemove", (ev, d) => {
-      if (d.id === state.currentId && state.stage === STAGE.COUNTRY) { tooltip.style.opacity = 0; return; }
+      // During the game, hide tooltip for the active target country.
+      if (!state.studyMapMode && d.id === state.currentId && state.stage === STAGE.COUNTRY) {
+        tooltip.style.opacity = 0; return;
+      }
       const meta = COUNTRIES[d.id];
       if (!meta) return;
-      tooltip.textContent = meta.name;
+      // In study map mode, show name AND capital. In-game, show name only.
+      tooltip.innerHTML = state.studyMapMode
+        ? `<strong>${meta.name}</strong><span style="color:var(--text-med);font-style:italic;font-weight:400;"> · ${meta.capital}</span>`
+        : meta.name;
       tooltip.style.left = ev.clientX + "px";
       tooltip.style.top = ev.clientY + "px";
       tooltip.style.opacity = 1;
@@ -1252,6 +1517,7 @@ function submitAnswer() {
         .classed("target", false).classed("correct-flash", true);
       showFeedback("correct", `✓ ${meta.name}. +${pts}`);
       fireConfetti();
+      playCorrectSfx();
       updateStats();
       beginCapitalStage(meta);
     } else {
@@ -1264,6 +1530,7 @@ function submitAnswer() {
         revealCountry(meta);
       } else {
         showFeedback("wrong", `Not quite. ${3 - state.tries} tr${3 - state.tries === 1 ? "y" : "ies"} left.`);
+        playWrongSfx();
         if (state.voiceMode) restartListeningSoon();
       }
     }
@@ -1273,6 +1540,7 @@ function submitAnswer() {
       state.score += bonus;
       showFeedback("correct", `✓ ${meta.capital}. Bonus +${bonus}`);
       fireConfetti();
+      playCorrectSfx();
       updateStats();
       recordHistory(state.currentId, "correct");
       resolveCurrent();
@@ -1284,6 +1552,7 @@ function submitAnswer() {
         revealCapital(meta);
       } else {
         showFeedback("wrong", `Not the capital. ${3 - state.tries} tr${3 - state.tries === 1 ? "y" : "ies"} left.`);
+        playWrongSfx();
         if (state.voiceMode) restartListeningSoon();
       }
     }
@@ -1316,6 +1585,7 @@ function revealCountry(meta) {
   $("submitBtn").disabled = true;
   state.answered.add(state.currentId);
   stopListening();
+  playRevealSfx();
   updateStats();
   updateSuggestions();
 }
@@ -1324,6 +1594,7 @@ function revealCapital(meta) {
   showFeedback("reveal", `The capital is ${meta.capital}.`);
   $("promptSub").textContent = "Press Space for the next country";
   recordHistory(state.currentId, "partial");
+  playRevealSfx();
   resolveCurrent();
 }
 
@@ -1379,7 +1650,7 @@ function updateStats() {
 function updateLevelBadge() {
   const t = TIERS.find(tt => tt.key === state.level);
   if (!t) return;
-  $("levelNum").textContent = "Lv. " + t.roman;
+  $("levelNum").textContent = "Level " + t.roman;
   $("levelName").textContent = t.name;
   $("levelSelect").value = String(state.level);
 }
@@ -1419,8 +1690,11 @@ function showLevelUp() {
   // trigger reflow
   void overlay.offsetWidth;
   overlay.classList.add("show");
-  // Fire a celebratory confetti burst during the animation
+  // Fanfare + celebratory confetti burst during the animation
+  playLevelUpSfx();
   setTimeout(fireConfetti, 450);
+  // Switch ambient theme to the new level
+  startAmbient(state.level);
   setTimeout(() => {
     overlay.classList.remove("show");
     pickNext();
@@ -1434,8 +1708,10 @@ function showVictory() {
   $("victory").classList.add("show");
   $("victoryStats").innerHTML =
     `You conquered all five levels with a final score of <strong>${state.score}</strong>. Best streak: <strong>${state.best}</strong>.`;
-  // Big finale confetti
+  // Big finale confetti + victory fanfare
+  playVictorySfx();
   for (let i = 0; i < 3; i++) setTimeout(fireConfetti, i * 220);
+  stopAmbient();
 }
 
 /* =========================================================================
@@ -1459,6 +1735,7 @@ function resetGame(toLevel) {
   rebuildPool();
   updateLevelBadge();
   updateStats();
+  if (Audio.ready && !Audio.muted) startAmbient(state.level);
   pickNext();
 }
 
@@ -1469,6 +1746,7 @@ function jumpToLevel(lvl) {
   rebuildPool();
   updateLevelBadge();
   updateStats();
+  if (Audio.ready && !Audio.muted) startAmbient(lvl);
   pickNext();
 }
 
@@ -1606,8 +1884,30 @@ function filterStudy(query) {
   });
 }
 
-function openStudy() { $("studyModal").classList.add("show"); $("studySearch").focus(); }
-function closeStudy() { $("studyModal").classList.remove("show"); }
+function openStudy() {
+  // Hide the welcome overlay while studying so the map is visible behind map-mode
+  $("welcome").classList.remove("show");
+  $("studyModal").classList.add("show");
+  setStudyMode("list");
+  $("studySearch").focus();
+}
+function closeStudy() {
+  $("studyModal").classList.remove("show");
+  state.studyMapMode = false;
+  $("studyModal").classList.remove("map-mode");
+  // If the game hasn't started yet, return the user to the welcome overlay
+  if (state.stage === STAGE.IDLE && !state.currentId) {
+    $("welcome").classList.add("show");
+  }
+}
+function setStudyMode(mode) {
+  state.studyMapMode = (mode === "map");
+  $("studyModal").classList.toggle("map-mode", state.studyMapMode);
+  document.querySelectorAll(".study-tab").forEach(b => b.classList.toggle("active", b.dataset.study === mode));
+  if (mode === "list") {
+    setTimeout(() => { const s = $("studySearch"); if (s) s.focus(); }, 30);
+  }
+}
 
 /* =========================================================================
    EVENTS
@@ -1627,9 +1927,25 @@ function wire() {
   $("studyFromWelcome").addEventListener("click", (e) => { e.preventDefault(); openStudy(); });
   $("studySearch").addEventListener("input", (e) => filterStudy(e.target.value));
   $("studyModal").addEventListener("click", (e) => { if (e.target.id === "studyModal") closeStudy(); });
+  document.querySelectorAll(".study-tab").forEach(btn => {
+    btn.addEventListener("click", () => setStudyMode(btn.dataset.study));
+  });
 
-  $("startBtn").addEventListener("click", () => { $("welcome").classList.remove("show"); pickNext(); });
-  $("playAgainBtn").addEventListener("click", () => resetGame(1));
+  $("startBtn").addEventListener("click", async () => {
+    await audioInit();
+    $("welcome").classList.remove("show");
+    startAmbient(state.level);
+    pickNext();
+  });
+  $("playAgainBtn").addEventListener("click", async () => {
+    await audioInit();
+    resetGame(1);
+    startAmbient(1);
+  });
+  $("soundBtn").addEventListener("click", async () => {
+    await audioInit();
+    toggleMute();
+  });
   $("zoomIn").addEventListener("click", () => svg.transition().call(zoomBehavior.scaleBy, 1.5));
   $("zoomOut").addEventListener("click", () => svg.transition().call(zoomBehavior.scaleBy, 1/1.5));
   $("zoomReset").addEventListener("click", () => svg.transition().call(zoomBehavior.transform, d3.zoomIdentity));
@@ -1650,6 +1966,19 @@ function wire() {
 
     if (e.code !== "Space" && e.key !== " ") return;
     const activeIsInput = document.activeElement === $("answerInput");
+
+    // In voice mode the keyboard isn't being used to type, so Space always advances.
+    // COUNTRY stage → reveal + advance (skip). CAPITAL/RESOLVED → advance.
+    if (state.voiceMode) {
+      e.preventDefault();
+      if (state.stage === STAGE.COUNTRY) {
+        const meta = COUNTRIES[state.currentId];
+        if (meta) revealCountry(meta);
+        return;
+      }
+      advance();
+      return;
+    }
 
     if (state.stage === STAGE.RESOLVED || state.stage === STAGE.IDLE) {
       e.preventDefault();
