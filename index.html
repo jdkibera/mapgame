@@ -2846,6 +2846,8 @@ function speakBritish(text) {
   try { window.speechSynthesis.cancel(); } catch(e) {}
   const utter = new SpeechSynthesisUtterance(text);
   const v = pickBritishVoice();
+  // TEMP diagnostic — remove once Chrome playback is verified.
+  console.log("[voice]", v && v.name, "local:", v && v.localService, "/", window.speechSynthesis.getVoices().length, "voices");
   if (v) { utter.voice = v; utter.lang = v.lang; } else { utter.lang = "en-GB"; }
   utter.rate = 0.95;
   utter.pitch = 1.05;
@@ -3373,12 +3375,15 @@ function wire() {
     // carries the speechSynthesis call on Safari/iOS.
     speakBritish(greet);
 
-    // Mic is suppressed briefly so it doesn't capture the greeting.
+    // Mic is suppressed while the greeting plays. Multi-player greetings
+    // ("Welcome, Alice, Bob, Charlie! Alice, you're up first.") can run
+    // ~6s, so the window needs to cover them — 5s was cutting Safari's
+    // greeting off mid-sentence when the mic activated.
     state.suppressListening = true;
     setTimeout(() => {
       state.suppressListening = false;
       if (state.voiceMode) startListening();
-    }, 5000);
+    }, 8000);
 
     $("welcome").classList.remove("show");
     pickNext();
