@@ -2303,8 +2303,9 @@ function updateSuggestions() {
   SUGGEST.items = [];
   SUGGEST.index = -1;
   box.innerHTML = "";
-  // Hide entirely in voice mode, between questions, or when input is too short
-  if (state.voiceMode) { box.hidden = true; return; }
+  // Hide between questions, or when input is too short. (Suggestions
+  // show whenever the user is actively typing — voice mode being on
+  // doesn't suppress them, since typed input is always allowed.)
   if (state.stage === STAGE.IDLE || state.stage === STAGE.RESOLVED) { box.hidden = true; return; }
   const input = $("answerInput");
   const q = normalize(input.value);
@@ -2825,56 +2826,31 @@ if ("speechSynthesis" in window) {
 function pickBritishVoice() {
   const voices = getVoices();
   if (!voices.length) return null;
-  // LOCAL voices only on the first pass. Chrome's Google-branded voices
-  // (e.g. "Google UK English Female") are network-streamed — they queue
-  // utterances and silently drop them when the fetch stalls, which is
-  // exactly the "speak() with no onstart/onerror" symptom we chased.
-  // Fall back to the full list only if no local voice matches.
-  const gbFemaleNames = /(Kate|Serena|Martha|Karen|Moira|Fiona|Stephanie|Susan|Amelia|Microsoft Libby|Microsoft Sonia|Microsoft Hazel)/i;
-  const anyFemaleEn = /(Samantha|Zira|Jenny|Aria|Nora|Ava|Allison|Tessa|Veena|Karen)/i;
-  const pools = [
-    voices.filter(v => v.localService !== false),
-    voices,
-  ];
-  for (const pool of pools) {
-    if (!pool.length) continue;
-    const gbFemale = pool.find(v => /en.?GB/i.test(v.lang) && gbFemaleNames.test(v.name));
-    if (gbFemale) return gbFemale;
-    const femaleEn = pool.find(v => /^en/i.test(v.lang) && (gbFemaleNames.test(v.name) || anyFemaleEn.test(v.name)));
-    if (femaleEn) return femaleEn;
-    const anyGB = pool.find(v => /en.?GB/i.test(v.lang));
-    if (anyGB) return anyGB;
-    const anyEn = pool.find(v => /^en/i.test(v.lang));
-    if (anyEn) return anyEn;
-  }
-  return voices[0] || null;
+  // Known-female British voices across macOS / iOS / Windows / Chrome.
+  // Note: "Daniel" (macOS) is British MALE, so he's NOT on this list.
+  const gbFemaleNames = /(Kate|Serena|Martha|Karen|Moira|Fiona|Stephanie|Susan|Amelia|Google UK English Female|Microsoft Libby|Microsoft Sonia|Microsoft Hazel)/i;
+  // Fallback: known-female English voices (non-British) — Samantha on
+  // macOS/iOS, Zira/Jenny on Windows, Google US English voices. Better to
+  // sound female-American than a random default male.
+  const anyFemaleEn = /(Samantha|Zira|Jenny|Aria|Nora|Ava|Allison|Susan|Tessa|Veena|Google US English|Google Australian English Female|Karen)/i;
+  const gbFemale = voices.find(v => /en.?GB/i.test(v.lang) && gbFemaleNames.test(v.name));
+  const femaleEn = voices.find(v => /^en/i.test(v.lang) && (gbFemaleNames.test(v.name) || anyFemaleEn.test(v.name)));
+  const anyGB = voices.find(v => /en.?GB/i.test(v.lang));
+  const anyEn = voices.find(v => /^en/i.test(v.lang));
+  return gbFemale || femaleEn || anyGB || anyEn || voices[0] || null;
 }
 
 function speakBritish(text) {
-  if (Audio.muted) { console.log("[speak] skip — Audio.muted"); return; }
-  if (!("speechSynthesis" in window)) { console.log("[speak] skip — no speechSynthesis"); return; }
-  const s = window.speechSynthesis;
-  try { if (s.speaking || s.pending) s.cancel(); } catch(e) {}
-  try { if (s.paused) s.resume(); } catch(e) {}
+  if (Audio.muted) return;
+  if (!("speechSynthesis" in window)) return;
+  try { window.speechSynthesis.cancel(); } catch(e) {}
   const utter = new SpeechSynthesisUtterance(text);
   const v = pickBritishVoice();
-  if (v) { utter.voice = v; utter.lang = v.lang; }
+  if (v) { utter.voice = v; utter.lang = v.lang; } else { utter.lang = "en-GB"; }
   utter.rate = 0.95;
   utter.pitch = 1.05;
   utter.volume = 0.9;
-  // Diagnostic — logs the full lifecycle so we can see exactly where
-  // Chrome is dropping the utterance. Remove once the flow is stable.
-  console.log("[speak] speak()", {
-    text, voice: v && v.name, lang: utter.lang,
-    paused: s.paused, speaking: s.speaking, pending: s.pending,
-    voicesCount: s.getVoices().length
-  });
-  utter.onstart  = () => console.log("[speak] onstart", text);
-  utter.onend    = () => console.log("[speak] onend", text);
-  utter.onerror  = (e) => console.log("[speak] onerror", e.error || e);
-  utter.onpause  = () => console.log("[speak] onpause", text);
-  utter.onresume = () => console.log("[speak] onresume", text);
-  try { s.speak(utter); } catch(e) { console.log("[speak] speak() threw", e); }
+  try { window.speechSynthesis.speak(utter); } catch(e) {}
 }
 
 function updateLevelBadge() {
@@ -3274,7 +3250,6 @@ function wire() {
 
   let selectedMode = "solo";
   let _micRequested = false;
-  let _audioPrimed = false;
 
   // Ask the browser for mic permission exactly once. Triggered as soon
   // as the user commits any name — this gets the prompt out of the way
@@ -3286,26 +3261,6 @@ function wire() {
     navigator.mediaDevices.getUserMedia({ audio: true })
       .then(stream => stream.getTracks().forEach(t => t.stop()))
       .catch(() => {});
-  }
-
-  // Prime the Tone.js AudioContext on the user's FIRST interaction with
-  // the welcome card — not on Start click. On Chrome desktop, activating
-  // an AudioContext in the same tick as speechSynthesis.speak() silences
-  // the utterance. Resuming it seconds earlier (during mode select or
-  // first keystroke) puts the context in a stable running state well
-  // before Start, so the greeting plays cleanly.
-  //
-  // NB: priming only the AudioContext — NOT a silent TTS utterance. A
-  // silent-prime speak() consumes the gesture token (see SessionLog).
-  function primeAudio() {
-    if (_audioPrimed) return;
-    _audioPrimed = true;
-    audioInit().catch(() => {});
-  }
-  const welcomeEl = $("welcome");
-  if (welcomeEl) {
-    welcomeEl.addEventListener("pointerdown", primeAudio);
-    welcomeEl.addEventListener("keydown", primeAudio);
   }
 
   // Enable the Begin button only when there's a valid name selection.
@@ -3414,11 +3369,8 @@ function wire() {
       ? `Welcome, ${state.players.map(p => p.name).join(", ")}! ${firstUp}, you're up first.`
       : `Welcome, ${state.players[0].name}!`;
 
-    // SYNCHRONOUS inside the click gesture — no await before speak().
-    // Chrome's speechSynthesis silently drops utterances if the gesture
-    // state has been lost across an await. The AudioContext was already
-    // primed on the first welcome-card interaction, so Tone is ready
-    // and speaking here doesn't collide with a concurrent Tone.start().
+    // Speak first — SYNCHRONOUSLY, before any await — so the user gesture
+    // carries the speechSynthesis call on Safari/iOS.
     speakBritish(greet);
 
     // Mic is suppressed briefly so it doesn't capture the greeting.
@@ -3431,8 +3383,8 @@ function wire() {
     $("welcome").classList.remove("show");
     pickNext();
 
-    // Audio was primed earlier; this just schedules Tone.Transport.start
-    // once audioInit settles (usually already resolved).
+    // Tone.js audio init can happen in the background — it doesn't
+    // affect the greeting playback.
     audioInit().then(() => startAmbient(state.level)).catch(() => {});
   });
   $("playAgainBtn").addEventListener("click", async () => {
