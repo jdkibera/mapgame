@@ -1762,8 +1762,10 @@ function applyPlayerName() {
       ? state.players.map(p => p.name).join(" · ")
       : "A Cartographer's Quiz";
   }
-  const welcomeH2 = document.getElementById("welcomeGreeting");
-  if (welcomeH2) welcomeH2.textContent = `Welcome, ${name}`;
+  // NB: don't touch #welcomeGreeting here — its text is driven by
+  // refreshGreetingHeading() based on what the user has actually typed.
+  // Overwriting it at init made empty-localStorage (e.g. incognito) show
+  // "Welcome, Tallulah" before any name was entered.
 }
 
 /* =========================================================================
