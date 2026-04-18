@@ -2825,18 +2825,29 @@ if ("speechSynthesis" in window) {
 function pickBritishVoice() {
   const voices = getVoices();
   if (!voices.length) return null;
-  // Known-female British voices across macOS / iOS / Windows / Chrome.
-  // Note: "Daniel" (macOS) is British MALE, so he's NOT on this list.
-  const gbFemaleNames = /(Kate|Serena|Martha|Karen|Moira|Fiona|Stephanie|Susan|Amelia|Google UK English Female|Microsoft Libby|Microsoft Sonia|Microsoft Hazel)/i;
-  // Fallback: known-female English voices (non-British) — Samantha on
-  // macOS/iOS, Zira/Jenny on Windows, Google US English voices. Better to
-  // sound female-American than a random default male.
-  const anyFemaleEn = /(Samantha|Zira|Jenny|Aria|Nora|Ava|Allison|Susan|Tessa|Veena|Google US English|Google Australian English Female|Karen)/i;
-  const gbFemale = voices.find(v => /en.?GB/i.test(v.lang) && gbFemaleNames.test(v.name));
-  const femaleEn = voices.find(v => /^en/i.test(v.lang) && (gbFemaleNames.test(v.name) || anyFemaleEn.test(v.name)));
-  const anyGB = voices.find(v => /en.?GB/i.test(v.lang));
-  const anyEn = voices.find(v => /^en/i.test(v.lang));
-  return gbFemale || femaleEn || anyGB || anyEn || voices[0] || null;
+  // LOCAL voices only on the first pass. Chrome's Google-branded voices
+  // (e.g. "Google UK English Female") are network-streamed — they queue
+  // utterances and silently drop them when the fetch stalls, which is
+  // exactly the "speak() with no onstart/onerror" symptom we chased.
+  // Fall back to the full list only if no local voice matches.
+  const gbFemaleNames = /(Kate|Serena|Martha|Karen|Moira|Fiona|Stephanie|Susan|Amelia|Microsoft Libby|Microsoft Sonia|Microsoft Hazel)/i;
+  const anyFemaleEn = /(Samantha|Zira|Jenny|Aria|Nora|Ava|Allison|Tessa|Veena|Karen)/i;
+  const pools = [
+    voices.filter(v => v.localService !== false),
+    voices,
+  ];
+  for (const pool of pools) {
+    if (!pool.length) continue;
+    const gbFemale = pool.find(v => /en.?GB/i.test(v.lang) && gbFemaleNames.test(v.name));
+    if (gbFemale) return gbFemale;
+    const femaleEn = pool.find(v => /^en/i.test(v.lang) && (gbFemaleNames.test(v.name) || anyFemaleEn.test(v.name)));
+    if (femaleEn) return femaleEn;
+    const anyGB = pool.find(v => /en.?GB/i.test(v.lang));
+    if (anyGB) return anyGB;
+    const anyEn = pool.find(v => /^en/i.test(v.lang));
+    if (anyEn) return anyEn;
+  }
+  return voices[0] || null;
 }
 
 function speakBritish(text) {
