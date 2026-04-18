@@ -3388,9 +3388,16 @@ function wire() {
     $("welcome").classList.remove("show");
     pickNext();
 
-    // Tone.js audio init can happen in the background — it doesn't
-    // affect the greeting playback.
-    audioInit().then(() => startAmbient(state.level)).catch(() => {});
+    // Tone.js audio init is DEFERRED until the greeting has had time to
+    // play. Chrome silences a queued speechSynthesis utterance when an
+    // AudioContext activates in the same tick — which is what was
+    // happening here (Samantha picked correctly per diagnostic, but no
+    // audio). 4s covers a solo greeting; the 8s mic-suppress window
+    // covers multi-player. Tone.start still works outside a gesture
+    // once the page has had any prior interaction.
+    setTimeout(() => {
+      audioInit().then(() => startAmbient(state.level)).catch(() => {});
+    }, 4000);
   });
   $("playAgainBtn").addEventListener("click", async () => {
     await audioInit();
