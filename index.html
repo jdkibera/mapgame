@@ -728,17 +728,33 @@
   }
   .hud-players .pstat.active .pname { color: var(--navy); font-weight: 600; }
 
-  /* Turn halo around the input — semi-transparent ring in the current
-     player's hue. Scaled down on small screens so it doesn't clip. */
-  body.multi-mode .input-wrap {
-    border-radius: 8px;
+  /* Turn indicator — 7px inset stroke painted INSIDE the answer input,
+     in the active player's colour. Semi-transparent so typed text stays
+     readable over it. Padding is bumped slightly so characters don't
+     crowd the stroke. */
+  body.multi-mode .input-wrap input[type="text"] {
+    box-shadow: inset 0 0 0 7px var(--turn-halo, transparent);
+    padding-left: 20px;
+    padding-right: 20px;
     transition: box-shadow 0.35s ease;
-    box-shadow: 0 0 0 18px var(--turn-halo, transparent);
   }
-  @media (max-width: 760px) {
-    body.multi-mode .input-wrap {
-      box-shadow: 0 0 0 8px var(--turn-halo, transparent);
-    }
+  /* Mic + Submit pick up the same colour so "it's my turn" reads at a
+     glance from the input, the mic, and the submit button together. */
+  body.multi-mode #micBtn,
+  body.multi-mode #submitBtn {
+    border-color: var(--turn-chip, var(--card-border));
+    box-shadow: inset 0 0 0 2px var(--turn-halo, transparent);
+    transition: border-color 0.35s ease, box-shadow 0.35s ease, background 0.35s ease;
+  }
+  body.multi-mode #submitBtn {
+    background: var(--turn-chip, var(--copper));
+    border: 1px solid var(--turn-chip, var(--copper-dark));
+    color: var(--cream);
+  }
+  body.multi-mode #micBtn.listening {
+    background: var(--turn-chip, var(--copper));
+    border-color: var(--turn-chip, var(--copper-dark));
+    color: var(--cream);
   }
 
   .secondary-link {
@@ -1687,14 +1703,15 @@ function flagUrl(id, size = "w160") {
    STATE
    ========================================================================= */
 const STAGE = { IDLE: "idle", COUNTRY: "country", CAPITAL: "capital", RESOLVED: "resolved" };
-// Per-player pastel palette tuned to sit alongside the copper/navy aesthetic.
-// Kept muted + warm so they feel cartographic rather than candy-bright.
+// Per-player palette: bright, saturated colours that contrast clearly
+// with the map's cream / sage / terracotta tones. Explicitly avoids
+// green and brown, which were conflating with land masses.
 const PLAYER_HUES = [
-  { halo: "rgba(194,123,92,0.32)",  chip: "#E3B49E" }, // copper / terracotta
-  { halo: "rgba(110,139,110,0.32)", chip: "#B5C9B0" }, // sage
-  { halo: "rgba( 90,120,150,0.32)", chip: "#B3C5D6" }, // dusty blue
-  { halo: "rgba(170,140,180,0.32)", chip: "#CCBBD1" }, // soft lavender
-  { halo: "rgba(199,154,90,0.30)",  chip: "#DBC88E" }, // wheat gold
+  { halo: "rgba( 37, 99,235,0.55)", chip: "#2563EB" }, // bright blue
+  { halo: "rgba(147, 51,234,0.55)", chip: "#9333EA" }, // bright purple
+  { halo: "rgba(234,179,  8,0.65)", chip: "#EAB308" }, // bright yellow
+  { halo: "rgba(  6,182,212,0.55)", chip: "#06B6D4" }, // bright cyan
+  { halo: "rgba(219, 39,119,0.55)", chip: "#DB2777" }, // bright magenta
 ];
 function hueFor(index) { return PLAYER_HUES[index % PLAYER_HUES.length]; }
 function makePlayer(name) {
@@ -2659,9 +2676,11 @@ function updateStats() {
       nameEl.appendChild(document.createTextNode(pl.name));
       hud.appendChild(cell);
     });
-    // Set the input-halo color on the body so CSS picks it up.
+    // Set the turn colours on the body so the input stroke, mic, and
+    // submit button all pick them up.
     const h = hueFor(state.currentPlayerIdx);
     document.body.style.setProperty("--turn-halo", h.halo);
+    document.body.style.setProperty("--turn-chip", h.chip);
   }
   // Turn banner in the prompt card (visible only in multi via body.multi-mode)
   const banner = $("turnBanner");
@@ -2821,26 +2840,30 @@ function pickBritishVoice() {
 }
 
 function speakBritish(text) {
-  if (Audio.muted) return;
-  if (!("speechSynthesis" in window)) return;
+  if (Audio.muted) { console.log("[speak] skip — Audio.muted"); return; }
+  if (!("speechSynthesis" in window)) { console.log("[speak] skip — no speechSynthesis"); return; }
   const s = window.speechSynthesis;
-  // Only cancel if something is actually playing/queued. An unconditional
-  // cancel() on Chrome consumes the user-gesture token and delays the
-  // greeting by 5-15s (see SessionLog — lessons learned).
   try { if (s.speaking || s.pending) s.cancel(); } catch(e) {}
-  // If the engine happens to be paused (Chrome can leave it paused after
-  // tab-switches), a conditional resume wakes it. Unconditional resume()
-  // was flagged as stalling Chrome, so this is gated on .paused.
   try { if (s.paused) s.resume(); } catch(e) {}
   const utter = new SpeechSynthesisUtterance(text);
   const v = pickBritishVoice();
   if (v) { utter.voice = v; utter.lang = v.lang; }
-  // If no voice picked, DON'T force utter.lang — Chrome silences
-  // utterances with a lang it can't resolve to a voice.
   utter.rate = 0.95;
   utter.pitch = 1.05;
   utter.volume = 0.9;
-  try { s.speak(utter); } catch(e) {}
+  // Diagnostic — logs the full lifecycle so we can see exactly where
+  // Chrome is dropping the utterance. Remove once the flow is stable.
+  console.log("[speak] speak()", {
+    text, voice: v && v.name, lang: utter.lang,
+    paused: s.paused, speaking: s.speaking, pending: s.pending,
+    voicesCount: s.getVoices().length
+  });
+  utter.onstart  = () => console.log("[speak] onstart", text);
+  utter.onend    = () => console.log("[speak] onend", text);
+  utter.onerror  = (e) => console.log("[speak] onerror", e.error || e);
+  utter.onpause  = () => console.log("[speak] onpause", text);
+  utter.onresume = () => console.log("[speak] onresume", text);
+  try { s.speak(utter); } catch(e) { console.log("[speak] speak() threw", e); }
 }
 
 function updateLevelBadge() {
