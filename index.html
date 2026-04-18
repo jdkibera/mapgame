@@ -435,6 +435,13 @@
     transition: background 0.15s;
   }
   button.primary:hover { background: var(--navy-soft); }
+  button.primary:disabled {
+    background: var(--text-light);
+    border-color: var(--text-light);
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+  button.primary:disabled:hover { background: var(--text-light); }
   button.icon {
     background: var(--cream);
     color: var(--text-med);
@@ -1285,7 +1292,7 @@
 <div class="overlay" id="welcome">
   <div class="card">
     <div class="flourish">— A Cartographer's Quiz —</div>
-    <h2 id="welcomeGreeting">Welcome, Tallulah</h2>
+    <h2 id="welcomeGreeting">Welcome! Enter Your Name</h2>
     <p>A country will be highlighted on the map. Name it — and for a bonus, name its capital. Three tries before it's revealed.</p>
 
     <div class="mode-toggle" role="tablist">
@@ -1295,7 +1302,7 @@
 
     <div class="name-field mode-pane" data-pane="solo">
       <label for="nameInput">Your name, Explorer —</label>
-      <input type="text" id="nameInput" placeholder="Tallulah" maxlength="24" autocomplete="off" spellcheck="false" />
+      <input type="text" id="nameInput" placeholder="Your name" maxlength="24" autocomplete="off" spellcheck="false" />
     </div>
 
     <div class="mode-pane multi-pane" data-pane="multi" hidden>
@@ -1309,7 +1316,7 @@
 
     <p style="font-size:0.85rem;">Progress through twelve levels, from <em>Home Waters</em> to <em>Here Be Dragons</em>. Use <span class="kbd">Space</span> to advance, <span class="kbd">Enter</span> to submit, and the <strong>🎤</strong> to switch to voice mode (stays on).</p>
     <div style="display:flex; flex-direction:column; align-items:center; gap:10px;">
-      <button class="primary" id="startBtn" style="padding:10px 24px; font-size:1rem;">Begin Voyage</button>
+      <button class="primary" id="startBtn" style="padding:10px 24px; font-size:1rem;" disabled>Begin Voyage</button>
       <a class="secondary-link" id="studyFromWelcome">Browse all countries first →</a>
     </div>
   </div>
@@ -3215,18 +3222,64 @@ function wire() {
     btn.addEventListener("click", () => setStudyMode(btn.dataset.study));
   });
 
-  // Live-update greeting as user types their name
-  const nameInput = $("nameInput");
-  if (nameInput) {
-    nameInput.value = getPlayerName() === "Tallulah" && !localStorage.getItem("we_name") ? "" : getPlayerName();
-    nameInput.addEventListener("input", () => {
-      const n = nameInput.value.trim() || "Tallulah";
-      document.getElementById("welcomeGreeting").textContent = `Welcome, ${n}`;
-    });
+  // ================================================================
+  // WELCOME SCREEN — name entry, mic permission, mode selection, Start
+  // ================================================================
+
+  let selectedMode = "solo";
+  let _micRequested = false;
+
+  // Ask the browser for mic permission exactly once. Triggered as soon
+  // as the user commits any name — this gets the prompt out of the way
+  // before the Start click, so the greeting isn't delayed by it.
+  function requestMicPermission() {
+    if (_micRequested) return;
+    _micRequested = true;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
+    navigator.mediaDevices.getUserMedia({ audio: true })
+      .then(stream => stream.getTracks().forEach(t => t.stop()))
+      .catch(() => {});
   }
 
-  // Mode tabs — swap between solo / multi panes on the welcome card.
-  let selectedMode = "solo";
+  // Enable the Begin button only when there's a valid name selection.
+  function currentNames() {
+    if (selectedMode === "multi") {
+      return [...document.querySelectorAll(".player-name")]
+        .map(i => i.value.trim()).filter(Boolean);
+    }
+    const nm = ($("nameInput") && $("nameInput").value.trim()) || "";
+    return nm ? [nm] : [];
+  }
+  function refreshStartButton() {
+    const names = currentNames();
+    const ok = selectedMode === "multi" ? names.length >= 2 : names.length >= 1;
+    $("startBtn").disabled = !ok;
+  }
+  function refreshGreetingHeading() {
+    const h2 = $("welcomeGreeting");
+    if (!h2) return;
+    const names = currentNames();
+    if (selectedMode === "multi") {
+      h2.textContent = names.length >= 2 ? "Welcome, Explorers!" : "Welcome! Enter Your Names";
+    } else {
+      h2.textContent = names.length ? `Welcome, ${names[0]}` : "Welcome! Enter Your Name";
+    }
+  }
+
+  // Name inputs — both solo and multi. Any input triggers:
+  //   (a) live greeting update
+  //   (b) start button enable/disable
+  //   (c) mic permission request (on first non-empty value)
+  function wireNameInput(input) {
+    input.addEventListener("input", () => {
+      refreshGreetingHeading();
+      refreshStartButton();
+      if (input.value.trim()) requestMicPermission();
+    });
+  }
+  document.querySelectorAll("#nameInput, .player-name").forEach(wireNameInput);
+
+  // Mode tabs — solo ⇄ multi.
   document.querySelectorAll(".mode-tab").forEach(btn => {
     btn.addEventListener("click", () => {
       selectedMode = btn.dataset.mode;
@@ -3234,26 +3287,18 @@ function wire() {
       document.querySelectorAll(".mode-pane").forEach(pane => {
         pane.hidden = pane.dataset.pane !== selectedMode;
       });
-      const welcomeH2 = document.getElementById("welcomeGreeting");
+      // Carry a solo-typed name into player 1 when flipping to multi.
       if (selectedMode === "multi") {
-        // Prefill the first player slot with whatever was typed into the
-        // solo name field (so switching modes doesn't lose their name).
         const soloName = ($("nameInput") && $("nameInput").value.trim()) || "";
         const firstSlot = document.querySelector(".player-name");
-        if (firstSlot && !firstSlot.value.trim() && soloName) {
-          firstSlot.value = soloName;
-        }
-        if (welcomeH2) welcomeH2.textContent = "Welcome, Explorers!";
-      } else {
-        if (welcomeH2) {
-          const n = ($("nameInput") && $("nameInput").value.trim()) || "Tallulah";
-          welcomeH2.textContent = `Welcome, ${n}`;
-        }
+        if (firstSlot && !firstSlot.value.trim() && soloName) firstSlot.value = soloName;
       }
+      refreshGreetingHeading();
+      refreshStartButton();
     });
   });
 
-  // Add-player button — up to 5 slots.
+  // + Add player — creates slots up to 5 total.
   const addPlayerBtn = $("addPlayerBtn");
   const playerInputs = $("playerInputs");
   if (addPlayerBtn && playerInputs) {
@@ -3261,39 +3306,35 @@ function wire() {
       const count = playerInputs.querySelectorAll("input.player-name").length;
       if (count >= 5) return;
       const inp = document.createElement("input");
-      inp.type = "text";
-      inp.className = "player-name";
+      inp.type = "text"; inp.className = "player-name";
       inp.placeholder = `Player ${count + 1}`;
-      inp.maxLength = 20;
-      inp.autocomplete = "off";
-      inp.spellcheck = false;
+      inp.maxLength = 20; inp.autocomplete = "off"; inp.spellcheck = false;
       playerInputs.appendChild(inp);
+      wireNameInput(inp);
       if (count + 1 >= 5) addPlayerBtn.disabled = true;
     });
   }
 
-  $("startBtn").addEventListener("click", async () => {
-    // Build the players list from whichever pane is active.
-    if (selectedMode === "multi") {
-      const names = [...document.querySelectorAll(".player-name")]
-        .map(i => i.value.trim())
-        .filter(Boolean);
-      if (names.length < 2) {
-        // Fall back to solo if fewer than 2 names provided.
-        state.mode = "solo";
-        state.players = [makePlayer(names[0] || $("nameInput").value.trim() || "Tallulah")];
-      } else {
-        state.mode = "multi";
-        state.players = names.slice(0, 5).map(makePlayer);
-      }
+  refreshStartButton();
+
+  // ----------------------------------------------------------------
+  // Start click — fire the greeting synchronously inside the gesture,
+  // immediately show the map, kick off audio + game in the background.
+  // No awaits before speakBritish().
+  // ----------------------------------------------------------------
+  $("startBtn").addEventListener("click", () => {
+    const names = currentNames();
+    if (selectedMode === "multi" && names.length >= 2) {
+      state.mode = "multi";
+      state.players = names.slice(0, 5).map(makePlayer);
     } else {
       state.mode = "solo";
-      const nm = $("nameInput") && $("nameInput").value.trim();
-      if (nm) setPlayerName(nm); else applyPlayerName();
-      state.players = [makePlayer(nm || getPlayerName())];
+      const nm = names[0] || "Explorer";
+      setPlayerName(nm);
+      state.players = [makePlayer(nm)];
       try { state.players[0].best = Number(localStorage.getItem("we_best") || 0) || 0; } catch(e) {}
     }
-    state.currentPlayerIdx = state.players.length - 1; // first advancePlayer rolls to 0
+    state.currentPlayerIdx = state.players.length - 1; // advancePlayer() rolls to 0
     document.body.classList.toggle("multi-mode", state.mode === "multi");
     applyPlayerName();
     const firstUp = state.players[0].name;
@@ -3301,19 +3342,23 @@ function wire() {
       ? `Hello explorers — ${state.players.map(p => p.name).join(", ")}. ${firstUp}, you're up first.`
       : `Hello ${state.players[0].name}, let's explore.`;
 
-    // Hold the mic closed for ~5s while the greeting plays, so the mic
-    // doesn't capture the agent's voice. (In the original code the mic
-    // just ran over the greeting; we keep the suppression because voice
-    // mode is on by default now.)
-    state.suppressListening = true;
-    setTimeout(() => { state.suppressListening = false; }, 5000);
-
-    // --- same shape as the original working version ---
-    await audioInit();
+    // Speak first — SYNCHRONOUSLY, before any await — so the user gesture
+    // carries the speechSynthesis call on Safari/iOS.
     speakBritish(greet);
+
+    // Mic is suppressed briefly so it doesn't capture the greeting.
+    state.suppressListening = true;
+    setTimeout(() => {
+      state.suppressListening = false;
+      if (state.voiceMode) startListening();
+    }, 5000);
+
     $("welcome").classList.remove("show");
-    startAmbient(state.level);
     pickNext();
+
+    // Tone.js audio init can happen in the background — it doesn't
+    // affect the greeting playback.
+    audioInit().then(() => startAmbient(state.level)).catch(() => {});
   });
   $("playAgainBtn").addEventListener("click", async () => {
     await audioInit();
