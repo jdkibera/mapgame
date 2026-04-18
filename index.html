@@ -3236,6 +3236,7 @@ function wire() {
 
   let selectedMode = "solo";
   let _micRequested = false;
+  let _audioPrimed = false;
 
   // Ask the browser for mic permission exactly once. Triggered as soon
   // as the user commits any name — this gets the prompt out of the way
@@ -3247,6 +3248,26 @@ function wire() {
     navigator.mediaDevices.getUserMedia({ audio: true })
       .then(stream => stream.getTracks().forEach(t => t.stop()))
       .catch(() => {});
+  }
+
+  // Prime the Tone.js AudioContext on the user's FIRST interaction with
+  // the welcome card — not on Start click. On Chrome desktop, activating
+  // an AudioContext in the same tick as speechSynthesis.speak() silences
+  // the utterance. Resuming it seconds earlier (during mode select or
+  // first keystroke) puts the context in a stable running state well
+  // before Start, so the greeting plays cleanly.
+  //
+  // NB: priming only the AudioContext — NOT a silent TTS utterance. A
+  // silent-prime speak() consumes the gesture token (see SessionLog).
+  function primeAudio() {
+    if (_audioPrimed) return;
+    _audioPrimed = true;
+    audioInit().catch(() => {});
+  }
+  const welcomeEl = $("welcome");
+  if (welcomeEl) {
+    welcomeEl.addEventListener("pointerdown", primeAudio);
+    welcomeEl.addEventListener("keydown", primeAudio);
   }
 
   // Enable the Begin button only when there's a valid name selection.
