@@ -1292,7 +1292,7 @@
 <div class="overlay" id="welcome">
   <div class="card">
     <div class="flourish">— A Cartographer's Quiz —</div>
-    <h2 id="welcomeGreeting">Welcome! Enter Your Name</h2>
+    <h2 id="welcomeGreeting">Welcome! Your Name?</h2>
     <p>A country will be highlighted on the map. Name it — and for a bonus, name its capital. Three tries before it's revealed.</p>
 
     <div class="mode-toggle" role="tablist">
@@ -2821,7 +2821,13 @@ function pickBritishVoice() {
 function speakBritish(text) {
   if (Audio.muted) return;
   if (!("speechSynthesis" in window)) return;
-  try { window.speechSynthesis.cancel(); } catch(e) {}
+  // Only cancel if something is actually playing/queued. An unconditional
+  // cancel() on Chrome consumes the user-gesture token and delays the
+  // greeting by 5-15s (see SessionLog — lessons learned).
+  try {
+    const s = window.speechSynthesis;
+    if (s.speaking || s.pending) s.cancel();
+  } catch(e) {}
   const utter = new SpeechSynthesisUtterance(text);
   const v = pickBritishVoice();
   if (v) { utter.voice = v; utter.lang = v.lang; } else { utter.lang = "en-GB"; }
@@ -3260,21 +3266,26 @@ function wire() {
     if (!h2) return;
     const names = currentNames();
     if (selectedMode === "multi") {
-      h2.textContent = names.length >= 2 ? "Welcome, Explorers!" : "Welcome! Enter Your Names";
+      h2.textContent = names.length >= 2 ? "Welcome, Explorers!" : "Welcome! Your Names?";
     } else {
-      h2.textContent = names.length ? `Welcome, ${names[0]}` : "Welcome! Enter Your Name";
+      h2.textContent = names.length ? `Welcome, ${names[0]}` : "Welcome! Your Name?";
     }
   }
 
-  // Name inputs — both solo and multi. Any input triggers:
-  //   (a) live greeting update
-  //   (b) start button enable/disable
-  //   (c) mic permission request (on first non-empty value)
+  // Name inputs — both solo and multi.
+  //   input  → live greeting + start-button enable
+  //   Enter/blur → mic permission request (only once the user has
+  //   finished typing, so the permission dialog doesn't interrupt them
+  //   mid-name and doesn't fire on every keystroke).
   function wireNameInput(input) {
     input.addEventListener("input", () => {
       refreshGreetingHeading();
       refreshStartButton();
-      if (input.value.trim()) requestMicPermission();
+    });
+    const commit = () => { if (input.value.trim()) requestMicPermission(); };
+    input.addEventListener("blur", commit);
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); commit(); input.blur(); }
     });
   }
   document.querySelectorAll("#nameInput, .player-name").forEach(wireNameInput);
@@ -3339,8 +3350,8 @@ function wire() {
     applyPlayerName();
     const firstUp = state.players[0].name;
     const greet = state.mode === "multi"
-      ? `Hello explorers — ${state.players.map(p => p.name).join(", ")}. ${firstUp}, you're up first.`
-      : `Hello ${state.players[0].name}, let's explore.`;
+      ? `Welcome, ${state.players.map(p => p.name).join(", ")}! ${firstUp}, you're up first.`
+      : `Welcome, ${state.players[0].name}!`;
 
     // Speak first — SYNCHRONOUSLY, before any await — so the user gesture
     // carries the speechSynthesis call on Safari/iOS.
