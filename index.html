@@ -2843,16 +2843,18 @@ function pickBritishVoice() {
 function speakBritish(text) {
   if (Audio.muted) return;
   if (!("speechSynthesis" in window)) return;
-  try { window.speechSynthesis.cancel(); } catch(e) {}
   const utter = new SpeechSynthesisUtterance(text);
   const v = pickBritishVoice();
-  // TEMP diagnostic — remove once Chrome playback is verified.
+  // TEMP diagnostic — full lifecycle, remove once playback is verified.
   console.log("[voice]", v && v.name, "local:", v && v.localService, "/", window.speechSynthesis.getVoices().length, "voices");
   if (v) { utter.voice = v; utter.lang = v.lang; } else { utter.lang = "en-GB"; }
   utter.rate = 0.95;
   utter.pitch = 1.05;
   utter.volume = 0.9;
-  try { window.speechSynthesis.speak(utter); } catch(e) {}
+  utter.onstart = () => console.log("[voice] onstart");
+  utter.onend   = () => console.log("[voice] onend");
+  utter.onerror = (e) => console.log("[voice] onerror", e.error || e);
+  try { window.speechSynthesis.speak(utter); } catch(e) { console.log("[voice] speak threw", e); }
 }
 
 function updateLevelBadge() {
