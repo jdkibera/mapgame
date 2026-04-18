@@ -51,6 +51,25 @@ The voice mode / mic permission layer is where I caused the most damage. Things 
 
 Each of those was a patch on top of the previous patch. By the end, the flow had 10+ moving pieces and none of them worked. The rebuild at 1b97bcf is ~80 lines of linear code that does the same thing; that's the shape to keep.
 
+## Root cause of the "Chrome: music plays, greeting silent" bug
+
+Found and fixed 2026-04-18. The diagnostic showed `speakBritish` called, voice resolved to `Google UK English Female`, then NO `onstart` / `onend` / `onerror` — a queued utterance that silently died. That's the classic failure mode of Chrome's Google-branded voices: they're network-streamed (`localService: false`), and when the Google TTS fetch stalls they drop silently with no event.
+
+`pickBritishVoice` explicitly listed `Google UK English Female` in its preferred-name regex, so Chrome (which exposes the full Google catalogue) always picked it first. On days when Google's endpoint is fine, the greeting plays. On days it isn't, total silence — and nothing else on the page logs anything.
+
+**Fix** was pure deletion: drop `Google UK English Female`, `Google US English`, and `Google Australian English Female` from the preferred-name regexes. With those gone the picker falls through to Samantha (local, reliable) on macOS.
+
+Related: never set `utter.lang = "en-GB"` as a fallback when no voice is picked — Chrome will silently pick the Google voice anyway via the lang fallback.
+
+## How to test the voice flow without a live browser
+
+`/tmp/mapgame-test/` has a Puppeteer harness that:
+- Instruments `SpeechSynthesis.prototype.speak` to log lifecycle events
+- Simulates the user's 199-voice Chrome (Samantha, Daniel, Karen + Google voices) via a `getVoices()` stub
+- Runs the actual Start-click flow end-to-end
+
+Useful because Puppeteer's bundled Chrome has only local voices — it won't reproduce the bug on its own, but the stub lets you verify the picker returns a local voice regardless of what Chrome hands you. Re-run after any change to `pickBritishVoice` or `speakBritish`.
+
 ## Known-fragile / open
 
 - **Chrome desktop TTS delay**: if the current minimal flow still stalls on Chrome, the next thing to look at is `audioInit()` — specifically `Tone.start()` and whether it holds onto the audio context in a way that blocks speech. Possibly just speak before calling audioInit at all and never await it.
@@ -69,14 +88,11 @@ Each of those was a patch on top of the previous patch. By the end, the flow had
 ## Recent commit trail (most relevant to voice/mic)
 
 ```
+8cf9144 Fix PLAYER_HUES rgba spacing — colours weren't reaching the CSS
+bd44a55 Drop Google network voices from pickBritishVoice regexes   ← the actual fix
+6d2b4ad Revert voice subsystem to 1b97bcf baseline; restore search suggest
 1b97bcf Clean rebuild of welcome → map voice flow
 83451c1 Restore original Start-handler + speakBritish shape verbatim
 c2fbd91 Rip out the stacked speech/mic workarounds
-a4a6294 Warm up speechSynthesis on welcome + stop mic from eating its own greeting
-69a185b Prime mic permission on first welcome-screen interaction
-23289b0 Prefer female voices + Chrome speechSynthesis resume/nudge
-19c0d63 Stop consuming the user-gesture token before the welcome greeting
-4c8ca5d Prime speech + hold mic stream on Start click for mobile
-50bb222 Continuous speech recognition + speak before async for iOS
-c551afa Voice mode default on, British greeting on Start   ← the working baseline
+c551afa Voice mode default on, British greeting on Start   ← the original
 ```
