@@ -3335,7 +3335,7 @@ function wire() {
   // immediately show the map, kick off audio + game in the background.
   // No awaits before speakBritish().
   // ----------------------------------------------------------------
-  $("startBtn").addEventListener("click", () => {
+  $("startBtn").addEventListener("click", async () => {
     const names = currentNames();
     if (selectedMode === "multi" && names.length >= 2) {
       state.mode = "multi";
@@ -3355,8 +3355,13 @@ function wire() {
       ? `Welcome, ${state.players.map(p => p.name).join(", ")}! ${firstUp}, you're up first.`
       : `Welcome, ${state.players[0].name}!`;
 
-    // Speak first — SYNCHRONOUSLY, before any await — so the user gesture
-    // carries the speechSynthesis call on Safari/iOS.
+    // Order matches the c551afa working baseline:
+    //   1. await audioInit()  — Tone.start() resolves inside the click gesture
+    //   2. speakBritish()     — greeting fires AFTER the audio context is live
+    //   3. startAmbient()     — music begins
+    // Flipping these (speak first, audioInit after) caused Chrome desktop to
+    // swallow the queued utterance when the AudioContext spun up behind it.
+    await audioInit();
     speakBritish(greet);
 
     // Mic is suppressed briefly so it doesn't capture the greeting.
@@ -3368,10 +3373,7 @@ function wire() {
 
     $("welcome").classList.remove("show");
     pickNext();
-
-    // Tone.js audio init can happen in the background — it doesn't
-    // affect the greeting playback.
-    audioInit().then(() => startAmbient(state.level)).catch(() => {});
+    startAmbient(state.level);
   });
   $("playAgainBtn").addEventListener("click", async () => {
     await audioInit();
