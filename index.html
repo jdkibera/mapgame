@@ -324,41 +324,13 @@
     letter-spacing: 0.08em;
   }
 
-  /* HUD — parchment labels pinned to the map. Double-ruled outline in
-     the map's ink colour (land-stroke), both rules displaced by the
-     hudSketch SVG filter so the edges read as hand-inked (like the
-     cartouche). Text inside the cards is untouched because only the
-     pseudo-element rectangles are filtered. */
+  /* HUD — parchment label. One border, four sides, done. */
   .hud {
     position: fixed;
     background: var(--card-bg);
+    border: 1.5px solid var(--land-stroke);
     border-radius: 3px;
-    /* Symmetric soft glow — a downward-offset shadow was bleeding
-       through the 22px stack gap and reading as a "continuous" left
-       edge spanning both cards. The sketched border carries the
-       visual weight now; the glow is just a hint of paper lift. */
     box-shadow: 0 0 12px rgba(30, 58, 95, 0.08);
-  }
-  .hud::before,
-  .hud::after {
-    content: "";
-    position: absolute;
-    pointer-events: none;
-    border-style: solid;
-    border-color: var(--land-stroke);
-  }
-  .hud::before {
-    inset: 0;
-    border-width: 1.3px;
-    border-radius: 3px;
-    filter: url(#hudSketch);
-  }
-  .hud::after {
-    inset: 4px;
-    border-width: 0.6px;
-    border-radius: 2px;
-    opacity: 0.5;
-    filter: url(#hudSketchFine);
   }
 
   .hud-title {
@@ -1565,17 +1537,18 @@
      plaque and the coastlines. Applied via CSS `filter: url(#hudSketch)`
      on the ::before / ::after rules of every .hud element. -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-  <!-- Filter region is tight enough that displaced pixels stay close
-       to each card's actual edge (was bleeding 14+px out earlier).
-       Scale matches the cartouche's handSketch filter (1.6) so the
-       HUD borders read with the same dip-pen wobble as the plaque. -->
-  <filter id="hudSketch" x="-1%" y="-10%" width="102%" height="120%">
-    <feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="2" seed="31" result="noise"/>
-    <feDisplacementMap in="SourceGraphic" in2="noise" scale="1.8" xChannelSelector="R" yChannelSelector="G"/>
+  <!-- Matches the cartouche's handSketch filter (baseFrequency 0.085,
+       scale 1.6) so HUD borders read with the same dip-pen wobble.
+       y-padding is 20% of element height, giving short cards like the
+       control strip (~40px) enough vertical room that the bottom
+       rule doesn't get clipped by the filter region. -->
+  <filter id="hudSketch" x="-2%" y="-20%" width="104%" height="140%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.085" numOctaves="2" seed="23" result="noise"/>
+    <feDisplacementMap in="SourceGraphic" in2="noise" scale="1.6" xChannelSelector="R" yChannelSelector="G"/>
   </filter>
-  <filter id="hudSketchFine" x="-1%" y="-10%" width="102%" height="120%">
-    <feTurbulence type="fractalNoise" baseFrequency="0.09" numOctaves="2" seed="47" result="noise"/>
-    <feDisplacementMap in="SourceGraphic" in2="noise" scale="1.2" xChannelSelector="R" yChannelSelector="G"/>
+  <filter id="hudSketchFine" x="-2%" y="-20%" width="104%" height="140%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.12" numOctaves="2" seed="47" result="noise"/>
+    <feDisplacementMap in="SourceGraphic" in2="noise" scale="1.1" xChannelSelector="R" yChannelSelector="G"/>
   </filter>
 </svg>
 
