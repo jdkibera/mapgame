@@ -2588,6 +2588,7 @@ function revealCountry(meta) {
     ? `The answer was ${meta.name}.`
     : `The answer was ${meta.name}. Its capital is ${meta.capital}.`;
   showFeedback("reveal", msg);
+  if (state.voiceMode) speakBritish(msg);
   $("promptSub").textContent = "Tap below or press Space for the next country";
   $("answerInput").disabled = true;
   $("submitBtn").disabled = true;
@@ -2601,7 +2602,9 @@ function revealCountry(meta) {
 }
 
 function revealCapital(meta) {
-  showFeedback("reveal", `The capital is ${meta.capital}.`);
+  const msg = `The capital is ${meta.capital}.`;
+  showFeedback("reveal", msg);
+  if (state.voiceMode) speakBritish(msg);
   $("promptSub").textContent = "Press Space for the next country";
   recordHistory(state.currentId, "partial");
   playRevealSfx();
@@ -3250,9 +3253,12 @@ function wire() {
   let selectedMode = "solo";
   let _micRequested = false;
 
-  // Ask the browser for mic permission exactly once. Triggered as soon
-  // as the user commits any name — this gets the prompt out of the way
-  // before the Start click, so the greeting isn't delayed by it.
+  // Ask the browser for mic permission exactly once. Fires on the
+  // user's first interaction with the welcome card (mode tab click,
+  // first keystroke, etc.) — and again as a backstop when they commit
+  // a name via Enter/blur. By the time they hit Begin Voyage the
+  // Chrome mic dialog is already answered and the greeting isn't
+  // delayed by it.
   function requestMicPermission() {
     if (_micRequested) return;
     _micRequested = true;
@@ -3260,6 +3266,10 @@ function wire() {
     navigator.mediaDevices.getUserMedia({ audio: true })
       .then(stream => stream.getTracks().forEach(t => t.stop()))
       .catch(() => {});
+  }
+  const welcomeEl = $("welcome");
+  if (welcomeEl) {
+    welcomeEl.addEventListener("pointerdown", requestMicPermission, { once: false });
   }
 
   // Enable the Begin button only when there's a valid name selection.
