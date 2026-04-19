@@ -488,20 +488,58 @@
     border: 1px solid var(--card-border);
   }
   .tries .dot.used { background: var(--copper); border-color: var(--copper-dark); }
-  .tries .timer {
+
+  /* Big countdown timer in the lower-left of the map. Glyph-only,
+     sits above the map but well clear of the prompt card. */
+  .try-timer {
+    position: fixed;
+    bottom: 22px;
+    left: 22px;
+    z-index: 20;
+    font-family: var(--font-display);
     font-variant-numeric: tabular-nums;
-    color: var(--text-med);
-    transition: color 0.2s;
+    font-size: 5rem;
+    line-height: 1;
+    padding: 18px 30px;
+    min-width: 120px;
+    text-align: center;
+    color: var(--navy);
+    background: rgba(250, 248, 245, 0.9);
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    box-shadow: 0 6px 22px rgba(30, 58, 95, 0.14);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    transition: color 0.2s, border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+    pointer-events: none;
+    user-select: none;
   }
-  .tries .timer.warn { color: var(--amber); }
-  .tries .timer.urgent {
+  .try-timer[hidden] { display: none; }
+  .try-timer.warn {
+    color: var(--amber);
+    border-color: var(--amber);
+    box-shadow: 0 6px 22px rgba(199, 154, 90, 0.3);
+  }
+  .try-timer.urgent {
     color: var(--bad);
-    font-weight: 600;
-    animation: timerPulse 0.6s ease-in-out infinite;
+    border-color: var(--bad);
+    box-shadow: 0 8px 28px rgba(184, 95, 79, 0.5);
+    animation: timerUrgent 0.5s ease-in-out infinite;
   }
-  @keyframes timerPulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.55; }
+  @keyframes timerUrgent {
+    0%, 100% { transform: scale(1);   opacity: 1; }
+    50%      { transform: scale(1.14); opacity: 0.85; }
+  }
+  @media (max-width: 760px) {
+    .try-timer {
+      bottom: auto;
+      top: 90px;
+      left: 6px;
+      font-size: 2.2rem;
+      padding: 8px 14px;
+      min-width: 54px;
+      border-radius: 10px;
+    }
   }
   .tries .hint-text { font-style: italic; letter-spacing: 0.08em; text-transform: none; font-size: 0.8rem; }
   .tries {
@@ -1289,6 +1327,8 @@
 
 <footer class="hud hud-footer">© Kibera LLC</footer>
 
+<div class="try-timer" id="tryTimer" aria-live="polite" hidden>10</div>
+
 <section class="hud hud-prompt">
   <img id="promptFlag" class="prompt-flag" alt="Flag" style="display:none" />
   <div class="prompt-row">
@@ -1313,8 +1353,6 @@
   </div>
   <div class="feedback" id="feedback"></div>
   <div class="tries" id="triesRow" role="button" tabindex="0" title="Tap to advance">
-    <span class="timer" id="tryTimer">10s</span>
-    <span style="color:var(--line-soft)">·</span>
     <span class="dots" id="triesDots">
       <span class="dot"></span><span class="dot"></span><span class="dot"></span>
     </span>
@@ -2526,15 +2564,21 @@ function submitAnswer() {
   cancelTryTimer();
 
   // Steal attempt: single try, bonus points on success, reveal on fail.
+  // Works for both the country question and the capital bonus question.
   if (state.stealActive) {
-    if (state.stage === STAGE.COUNTRY && matchesCountryAny(meta)) {
+    const isCountry = state.stage === STAGE.COUNTRY;
+    const hit = isCountry ? matchesCountryAny(meta) : matchesCapitalAny(meta);
+    if (hit) {
       const p = cur();
       p.score += STEAL_BONUS;
       p.levelScore += STEAL_BONUS;
-      p.correct += 1;
-      gMap.selectAll("path.country").filter(d => d.id === state.currentId)
-        .classed("target", false).classed("correct-flash", true);
-      showFeedback("correct", `✓ STEAL! ${meta.name}. +${STEAL_BONUS}`);
+      if (isCountry) p.correct += 1;
+      if (isCountry) {
+        gMap.selectAll("path.country").filter(d => d.id === state.currentId)
+          .classed("target", false).classed("correct-flash", true);
+      }
+      const label = isCountry ? meta.name : meta.capital;
+      showFeedback("correct", `✓ STEAL! ${label}. +${STEAL_BONUS}`);
       fireConfetti();
       playCorrectSfx();
       updateStats();
@@ -2545,7 +2589,7 @@ function submitAnswer() {
       showFeedback("wrong", "Steal failed.");
       playWrongSfx();
       exitSteal();
-      revealCountry(meta);
+      if (isCountry) revealCountry(meta); else revealCapital(meta);
     }
     return;
   }
@@ -2615,7 +2659,7 @@ function submitAnswer() {
       updateTriesDots();
       flashWrongInput();
       if (state.tries >= 3) {
-        revealCapital(meta);
+        if (canSteal()) enterSteal(); else revealCapital(meta);
       } else {
         showFeedback("wrong", `Not the capital. ${3 - state.tries} tr${3 - state.tries === 1 ? "y" : "ies"} left.`);
         playWrongSfx();
@@ -2783,8 +2827,10 @@ function startTryTimer(seconds) {
   cancelTryTimer();
   const s = seconds || TRY_SECONDS;
   state.tryTimerEnd = Date.now() + s * 1000;
-  renderTryTimer(s);
-  state.tryTimerInterval = setInterval(renderTryTimer, 250);
+  const el = $("tryTimer");
+  if (el) el.hidden = false;
+  renderTryTimer();
+  state.tryTimerInterval = setInterval(renderTryTimer, 200);
   state.tryTimerTimeout = setTimeout(onTryTimerExpired, s * 1000);
 }
 function cancelTryTimer() {
@@ -2792,14 +2838,14 @@ function cancelTryTimer() {
   if (state.tryTimerTimeout) { clearTimeout(state.tryTimerTimeout); state.tryTimerTimeout = null; }
   state.tryTimerEnd = 0;
   const el = $("tryTimer");
-  if (el) { el.textContent = `${TRY_SECONDS}s`; el.className = "timer"; }
+  if (el) { el.textContent = `${TRY_SECONDS}`; el.className = "try-timer"; el.hidden = true; }
 }
 function renderTryTimer() {
   const el = $("tryTimer");
   if (!el || !state.tryTimerEnd) return;
   const remaining = Math.max(0, Math.ceil((state.tryTimerEnd - Date.now()) / 1000));
-  el.textContent = `${remaining}s`;
-  el.className = "timer" + (remaining <= 3 ? " urgent" : remaining <= 5 ? " warn" : "");
+  el.textContent = `${remaining}`;
+  el.className = "try-timer" + (remaining <= 3 ? " urgent" : remaining <= 5 ? " warn" : "");
 }
 function onTryTimerExpired() {
   cancelTryTimer();
@@ -2808,10 +2854,11 @@ function onTryTimerExpired() {
   if (!meta) return;
   // Steal timeout → reveal (no bonus awarded).
   if (state.stealActive) {
+    const isCountry = state.stage === STAGE.COUNTRY;
     showFeedback("wrong", "Steal — time's up.");
     playWrongSfx();
     exitSteal();
-    revealCountry(meta);
+    if (isCountry) revealCountry(meta); else revealCapital(meta);
     return;
   }
   state.tries += 1;
@@ -2819,7 +2866,7 @@ function onTryTimerExpired() {
   cur().streak = 0;
   updateStats();
   if (state.tries >= 3) {
-    if (state.stage === STAGE.COUNTRY && canSteal()) {
+    if (canSteal()) {
       enterSteal();
     } else if (state.stage === STAGE.COUNTRY) {
       revealCountry(meta);
