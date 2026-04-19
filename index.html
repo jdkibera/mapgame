@@ -123,6 +123,8 @@
   }
   .ocean-pulse .ring.r2 { animation-delay: 0.6s; }
   .ocean-pulse .ring.r3 { animation-delay: 1.2s; }
+
+  .plane { pointer-events: none; filter: drop-shadow(0 1px 2px rgba(30,58,95,0.35)); }
   @keyframes oceanPulse {
     0%   { transform: scale(0.6); opacity: 0.85; stroke-width: 3; }
     100% { transform: scale(3.4); opacity: 0;    stroke-width: 0.5; }
@@ -226,6 +228,11 @@
     border-color: var(--navy);
   }
   .tbtn.toggled:hover { background: var(--navy-soft); color: var(--cream); }
+
+  /* Paused: dim the map + prompt so the state is unmistakable. */
+  body.paused #mapWrap { filter: brightness(0.55); }
+  body.paused .hud-prompt { opacity: 0.45; pointer-events: none; }
+  body.paused .try-timer { opacity: 0.35; }
 
   /* Flag shown in the prompt card */
   .hud-prompt { position: fixed; } /* ensure absolute flag positions correctly */
@@ -1343,6 +1350,11 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
     <span class="label">Flag</span>
   </button>
+  <button class="tbtn" id="pauseBtn" title="Pause / resume the game">
+    <svg class="pause-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+    <svg class="play-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+    <span class="label">Pause</span>
+  </button>
   <button class="tbtn" id="soundBtn" title="Toggle sound">
     <svg class="sound-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
     <svg class="sound-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
@@ -2133,6 +2145,18 @@ function setupMap() {
   pulse.append("circle").attr("class", "ring r3").attr("r", 6);
   pulse.append("circle").attr("class", "core").attr("r", 5);
 
+  // Tiny aviator plane that hops between the previous target and the
+  // next one each pickNext. Purely decorative.
+  const plane = rootG.append("g").attr("class", "plane").attr("id", "plane");
+  plane.style("opacity", 0);
+  // Body + wings silhouette, pointing east (rotation added at fly-time).
+  plane.append("path")
+    .attr("d", "M-10,0 L6,0 L10,-2 L10,2 L6,0 M-4,-6 L2,-6 L4,-1 L-4,-1 Z M-4,6 L2,6 L4,1 L-4,1 Z M-10,-3 L-10,3")
+    .attr("fill", "var(--copper)")
+    .attr("stroke", "var(--copper-dark)")
+    .attr("stroke-width", 0.8)
+    .attr("stroke-linejoin", "round");
+
   zoomBehavior = d3.zoom()
     .scaleExtent([1, 10])
     .on("zoom", (ev) => {
@@ -2513,6 +2537,33 @@ function shuffle(arr) {
   return a;
 }
 
+/* Decorative plane hop between the previous target and the new one.
+   Fades in at the old location, arcs over ~1.4s to the new one, fades
+   out. Skipped for oceans (they use centers, not features) and for
+   the very first pickNext (no prior country to take off from). */
+function flyPlaneTo(fromId, toId) {
+  const plane = d3.select("#plane");
+  if (!plane.size() || !pathGen) return;
+  const ptFor = (id) => {
+    const meta = COUNTRIES[id];
+    if (!meta) return null;
+    if (meta.ocean && meta.center) return projection(meta.center);
+    const feat = state.features.find(f => f.id === id);
+    return feat ? pathGen.centroid(feat) : null;
+  };
+  const from = fromId ? ptFor(fromId) : null;
+  const to = ptFor(toId);
+  if (!to || !from) return;
+  const angle = Math.atan2(to[1] - from[1], to[0] - from[0]) * 180 / Math.PI;
+  plane.interrupt()
+    .attr("transform", `translate(${from[0]},${from[1]}) rotate(${angle})`)
+    .style("opacity", 0)
+    .transition().duration(220).style("opacity", 0.9)
+    .transition().duration(1400).ease(d3.easeCubicInOut)
+      .attr("transform", `translate(${to[0]},${to[1]}) rotate(${angle})`)
+    .transition().duration(320).style("opacity", 0);
+}
+
 function isRegionFiltered() {
   return state.regionFilter && state.regionFilter !== "all";
 }
@@ -2583,9 +2634,12 @@ function pickNext() {
     }
   }
   const id = remaining[Math.floor(Math.random() * remaining.length)];
+  const prevId = state.currentId;
   // Rotate to the next player for each new country (multi mode only).
   advancePlayer();
   state.currentId = id;
+  // Fly the little plane from the previous target to the new one.
+  flyPlaneTo(prevId, id);
   state.stage = STAGE.COUNTRY;
   state.tries = 0;
   clearActiveClasses();
@@ -2840,7 +2894,9 @@ function advance() {
     // the capital bonus hands it to the next player as a steal rather
     // than just logging a skip.
     if (canSteal()) { enterSteal(); return; }
-    showFeedback("", `Skipped — capital is ${meta.capital}.`);
+    const msg = `The capital is ${meta.capital}.`;
+    showFeedback("", msg);
+    if (state.voiceMode) speakBritish(msg);
     recordHistory(state.currentId, "partial");
     resolveCurrent();
     return;
@@ -2910,6 +2966,56 @@ function advancePlayer() {
   if (state.mode !== "multi" || state.players.length <= 1) return;
   state.currentPlayerIdx = (state.currentPlayerIdx + 1) % state.players.length;
   state.turnJustAdvanced = true;
+}
+
+/* Pause / resume. Freezes the try timer (preserving remaining seconds),
+   cancels auto-advance, stops listening, and disables the answer input
+   so nothing can change until the player hits Resume. */
+function pauseGame() {
+  if (state.paused) return;
+  if (state.stage !== STAGE.COUNTRY && state.stage !== STAGE.CAPITAL) return;
+  state.paused = true;
+  state.pausedRemaining = state.tryTimerEnd
+    ? Math.max(0, Math.ceil((state.tryTimerEnd - Date.now()) / 1000))
+    : 0;
+  cancelTryTimer();
+  cancelAutoAdvance();
+  stopListening();
+  $("answerInput").disabled = true;
+  $("submitBtn").disabled = true;
+  document.body.classList.add("paused");
+  updatePauseUI();
+}
+function resumeGame() {
+  if (!state.paused) return;
+  state.paused = false;
+  document.body.classList.remove("paused");
+  $("answerInput").disabled = false;
+  $("submitBtn").disabled = false;
+  updatePauseUI();
+  if (state.pausedRemaining > 0) {
+    startTryTimer(state.pausedRemaining);
+  }
+  state.pausedRemaining = 0;
+  if (state.voiceMode) startListening();
+  $("answerInput").focus();
+}
+function togglePause() { if (state.paused) resumeGame(); else pauseGame(); }
+function updatePauseUI() {
+  const btn = $("pauseBtn");
+  if (!btn) return;
+  const pauseIcon = btn.querySelector(".pause-icon");
+  const playIcon  = btn.querySelector(".play-icon");
+  const label = btn.querySelector(".label");
+  if (state.paused) {
+    if (pauseIcon) pauseIcon.style.display = "none";
+    if (playIcon)  playIcon.style.display  = "inline-block";
+    if (label) label.textContent = "Resume";
+  } else {
+    if (pauseIcon) pauseIcon.style.display = "";
+    if (playIcon)  playIcon.style.display  = "none";
+    if (label) label.textContent = "Pause";
+  }
 }
 
 /* Per-try 10-second countdown. Each try the player has gets its own
@@ -3840,6 +3946,7 @@ function wire() {
     toggleMute();
   });
   $("flagBtn").addEventListener("click", toggleFlagMode);
+  $("pauseBtn").addEventListener("click", togglePause);
   $("zoomToggleBtn").addEventListener("click", toggleAutoZoom);
   $("triesRow").addEventListener("click", onAdvanceTap);
   $("triesRow").addEventListener("keydown", (e) => {
