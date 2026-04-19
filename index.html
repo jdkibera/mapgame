@@ -33,8 +33,6 @@
     --land: #E2DAD0;
     --land-stroke: #D0C8BE;
     --graticule: #B8C6D4;
-    --ink: #3A2F22;
-    --parchment: #F5EAC8;
 
     --good: #6E8B6E;
     --good-soft: #C4D4BC;
@@ -48,26 +46,6 @@
     --font-display: 'IM Fell English SC', 'Cormorant Garamond', Georgia, serif;
   }
 
-  /* Map themes — swap the map palette without touching the UI chrome.
-     The UI (HUD cards, copper/navy accents) stays constant across all
-     themes so the game feels like the same app dressed up. */
-  body.theme-parchment {
-    --ocean: #EFE2B8;
-    --ocean-deep: #DEC887;
-    --land: #F8ECC4;
-    --land-stroke: #9A7A42;
-    --graticule: #BC9659;
-    --warm-gray: #F0DFA8;
-  }
-  body.theme-antique {
-    --ocean: #D8C499;
-    --ocean-deep: #B89863;
-    --land: #6B4F2E;
-    --land-stroke: #2F1E0E;
-    --graticule: #8B6E42;
-    --warm-gray: #C7AE76;
-  }
-
   * { box-sizing: border-box; }
   html, body {
     margin: 0; padding: 0;
@@ -78,17 +56,42 @@
     font-weight: 400;
   }
 
-  /* Full-bleed map */
+  /* Full-bleed map. Layered background gives the ocean some depth:
+     a soft top-left highlight (lit from above), a centre body of
+     warm sea blue fading to a slightly darker vignette at the edges,
+     and a whisper-faint noise layer (via data-URI SVG turbulence) so
+     the ocean reads as aged paper rather than flat colour. */
   #mapWrap {
     position: fixed; inset: 0;
-    background: radial-gradient(ellipse at center, var(--ocean) 0%, var(--ocean-deep) 90%);
+    background:
+      radial-gradient(ellipse at 28% 22%, rgba(255,255,255,0.28) 0%, transparent 55%),
+      radial-gradient(ellipse at 78% 78%, rgba(30,58,95,0.10) 0%, transparent 60%),
+      radial-gradient(ellipse at center, var(--ocean) 0%, var(--ocean-deep) 82%, #BFC9D4 100%);
+  }
+  /* Paper grain overlay — a small SVG tile with subtle fractal noise,
+     repeated across the whole map. Low opacity so it just hints at
+     texture rather than dominating. */
+  #mapWrap::after {
+    content: "";
+    position: absolute; inset: 0;
+    pointer-events: none;
+    opacity: 0.18;
+    mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.55  0 0 0 0 0.50  0 0 0 0 0.42  0 0 0 0.45 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+    background-size: 220px 220px;
   }
   svg#map { width: 100%; height: 100%; display: block; }
 
+  /* One group-level drop-shadow across all countries — much faster
+     than a filter per-path, and shared shadows between neighbours
+     feel right (neighbouring countries don't get inner borders). */
+  g.countries {
+    filter: drop-shadow(0 1px 1px rgba(70, 55, 40, 0.35));
+  }
   .country {
     fill: var(--land);
     stroke: var(--land-stroke);
-    stroke-width: 0.5;
+    stroke-width: 0.6;
     transition: fill 0.25s ease, stroke 0.25s ease;
   }
   .country.hover { fill: #D7CDBF; cursor: help; }
@@ -146,28 +149,6 @@
   .ocean-pulse .ring.r2 { animation-delay: 0.6s; }
   .ocean-pulse .ring.r3 { animation-delay: 1.2s; }
 
-  .plane {
-    pointer-events: none;
-    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3));
-  }
-  .plane-trail { pointer-events: none; }
-
-  /* Ships slowly drift + bob. Each ship gets its own animation-delay
-     (set inline) so the fleet doesn't move in lockstep. */
-  .ships g.ship {
-    pointer-events: none;
-    opacity: 0.85;
-    animation-name: shipDrift;
-    animation-timing-function: ease-in-out;
-    animation-iteration-count: infinite;
-  }
-  @keyframes shipDrift {
-    0%   { translate: 0 0; }
-    25%  { translate: 14px -2px; }
-    50%  { translate: 28px 0; }
-    75%  { translate: 14px -2px; }
-    100% { translate: 0 0; }
-  }
   @keyframes oceanPulse {
     0%   { transform: scale(0.6); opacity: 0.85; stroke-width: 3; }
     100% { transform: scale(3.4); opacity: 0;    stroke-width: 0.5; }
@@ -1530,14 +1511,6 @@
           <option value="0">All (unlimited)</option>
         </select>
       </label>
-      <label>
-        <span>Map</span>
-        <select id="welcomeTheme">
-          <option value="cartographer">Cartographer</option>
-          <option value="parchment">Parchment</option>
-          <option value="antique">Antique Atlas</option>
-        </select>
-      </label>
     </div>
 
     <p style="font-size:0.85rem;">Progress through twelve levels, from <em>Home Waters</em> to <em>Here Be Dragons</em>. Use <span class="kbd">Space</span> to advance, <span class="kbd">Enter</span> to submit, and the <strong>🎤</strong> to switch to voice mode (stays on).</p>
@@ -1953,10 +1926,6 @@ let state = {
   // 0 = unlimited (play every tier to the end).
   gameLength: 50,
   totalAnswered: 0,
-  // Visual theme for the map itself. "cartographer" is the original
-  // cream + navy look; alternates dress the map in parchment or
-  // antique-atlas palettes.
-  theme: "cartographer",
 };
 // cur() returns the player whose turn it is. Always safe even if mis-indexed.
 function cur() { return state.players[state.currentPlayerIdx] || state.players[0]; }
@@ -1964,7 +1933,6 @@ try { state.autoZoom = JSON.parse(localStorage.getItem("we_autoZoom") || "true")
 try { state.flagMode = JSON.parse(localStorage.getItem("we_flagMode") || "false"); } catch(e) {}
 try { state.voiceMode = JSON.parse(localStorage.getItem("we_voiceMode") || "true"); } catch(e) {}
 try { state.gameLength = Number(localStorage.getItem("we_gameLength") || 50) || 0; } catch(e) {}
-try { state.theme = localStorage.getItem("we_theme") || "cartographer"; } catch(e) {}
 try { state.players[0].best = Number(localStorage.getItem("we_best") || 0) || 0; } catch(e) { state.players[0].best = 0; }
 
 /* =========================================================================
@@ -2228,34 +2196,6 @@ function setupMap() {
   pulse.append("circle").attr("class", "ring r3").attr("r", 6);
   pulse.append("circle").attr("class", "core").attr("r", 5);
 
-  // Layer that holds fading dotted trails left behind by the plane.
-  // Separate <g> so we can insert/remove paths without disturbing the
-  // plane element itself.
-  rootG.append("g").attr("class", "plane-trails").attr("id", "planeTrails");
-
-  // Ambient ship layer — a small fleet that drifts slowly around the
-  // oceans while the game plays. Drawn before the plane so the plane
-  // appears on top.
-  rootG.append("g").attr("class", "ships").attr("id", "ships");
-
-  // Vintage biplane silhouette. Fuselage + twin stacked wings + tail +
-  // propeller. Faces east by default; plane journeys rotate to heading.
-  const plane = rootG.append("g").attr("class", "plane").attr("id", "plane");
-  plane.style("opacity", 0);
-  const ink = "var(--ink)";
-  // Fuselage + tail fin
-  plane.append("path")
-    .attr("d", "M-14,-0.8 L9,-0.8 L13,0 L9,0.8 L-14,0.8 Z M-14,-3 L-11,-0.8 L-14,-0.8 Z")
-    .attr("fill", ink);
-  // Upper wing
-  plane.append("rect").attr("x", -9).attr("y", -4.5).attr("width", 16).attr("height", 1.6).attr("fill", ink);
-  // Lower wing
-  plane.append("rect").attr("x", -7).attr("y",  2.9).attr("width", 13).attr("height", 1.6).attr("fill", ink);
-  // Struts between wings
-  plane.append("line").attr("x1", -5).attr("y1", -2.9).attr("x2", -5).attr("y2", 2.9).attr("stroke", ink).attr("stroke-width", 0.5);
-  plane.append("line").attr("x1",  4).attr("y1", -2.9).attr("x2",  4).attr("y2", 2.9).attr("stroke", ink).attr("stroke-width", 0.5);
-  // Propeller
-  plane.append("line").attr("x1", 13).attr("y1", -3).attr("x2", 13).attr("y2", 3).attr("stroke", ink).attr("stroke-width", 1).attr("stroke-linecap", "round");
 
   zoomBehavior = d3.zoom()
     .scaleExtent([1, 10])
@@ -2274,129 +2214,6 @@ function setupMap() {
   // Reset any lingering zoom transform from the previous viewport so the
   // map starts at identity after a rotation / resize.
   svg.call(zoomBehavior.transform, d3.zoomIdentity);
-
-  spawnFleet();
-  schedulePlaneJourney(2500);
-}
-
-/* =========================================================================
-   AMBIENT DECOR — ships drifting in the oceans + biplane arcing overhead
-   ========================================================================= */
-// Galleon silhouette drawn into a parent <g>. 3 masts, triangular sails,
-// a rounded hull. Origin at the waterline center.
-function drawShip(g) {
-  const ink = "var(--ink)";
-  const sail = "var(--parchment)";
-  // Hull
-  g.append("path")
-    .attr("d", "M-7,1.4 L-5.2,4 L5.2,4 L7,1.4 Z")
-    .attr("fill", ink);
-  // Masts
-  [-3.4, 0, 3.4].forEach(x => {
-    g.append("line").attr("x1", x).attr("y1", 1.4).attr("x2", x).attr("y2", -6).attr("stroke", ink).attr("stroke-width", 0.55);
-  });
-  // Sails (simple billows)
-  g.append("path").attr("d", "M-3.4,-5.5 L-0.5,-3 L-3.4,-3 Z").attr("fill", sail).attr("stroke", ink).attr("stroke-width", 0.4);
-  g.append("path").attr("d", "M0,-6 L3,-3 L0,-3 Z").attr("fill", sail).attr("stroke", ink).attr("stroke-width", 0.4);
-  g.append("path").attr("d", "M3.4,-5.5 L6.3,-3 L3.4,-3 Z").attr("fill", sail).attr("stroke", ink).attr("stroke-width", 0.4);
-}
-
-// Spawn a small fleet of ships at ocean-center points (plus a couple
-// of extra spots for visual balance). Each ship drifts on its own
-// infinite keyframe loop; pool is rebuilt whenever the map rescales.
-function spawnFleet() {
-  const host = d3.select("#ships");
-  if (!host.size()) return;
-  host.selectAll("*").remove();
-  // Anchor points — ocean centers mostly, with a couple extras in
-  // under-populated quadrants.
-  const anchors = [
-    [-150,  20], [-40,  30], [ 70, -10],   // Pacific / Atlantic / Indian
-    [-25,  55], [ 150,  40],               // North Atlantic / North Pacific
-    [-80, -15], [ 110, -30],               // S. Pacific (E) / SE Asia seas
-  ];
-  anchors.forEach((lonlat, i) => {
-    const pt = projection(lonlat);
-    if (!pt) return;
-    const g = host.append("g")
-      .attr("class", "ship")
-      .attr("transform", `translate(${pt[0]}, ${pt[1]})`)
-      .style("animation-delay", `-${(i * 7) % 40}s`)
-      .style("animation-duration", `${60 + (i * 11) % 30}s`);
-    drawShip(g);
-  });
-}
-
-// Lon/lat pairs within the normal projection visible range. Biased
-// slightly away from the extreme poles.
-function randomGeo() {
-  return [
-    -170 + Math.random() * 340,
-    -55  + Math.random() * 110,
-  ];
-}
-
-// Fire off a plane journey from a random start to a random end along a
-// great-circle arc. Leaves a fading dotted trail along the route and
-// chains the next journey after a short rest.
-function flyPlaneJourney() {
-  const plane = d3.select("#plane");
-  const trailLayer = d3.select("#planeTrails");
-  if (!plane.size() || !trailLayer.size() || !projection) {
-    schedulePlaneJourney(8000);
-    return;
-  }
-  const start = randomGeo();
-  const end = randomGeo();
-  const interp = d3.geoInterpolate(start, end);
-  const steps = 72;
-  // Build 2D-projected path. Skip if anything fails to project
-  // (e.g. antipodal clipping on the projection).
-  const pts = [];
-  for (let i = 0; i <= steps; i++) {
-    const p = projection(interp(i / steps));
-    if (!p || !isFinite(p[0]) || !isFinite(p[1])) {
-      schedulePlaneJourney(6000);
-      return;
-    }
-    pts.push(p);
-  }
-  const lineGen = d3.line();
-  const trail = trailLayer.append("path")
-    .attr("class", "plane-trail")
-    .attr("d", lineGen(pts))
-    .attr("fill", "none")
-    .attr("stroke", "var(--ink)")
-    .attr("stroke-width", 0.8)
-    .attr("stroke-dasharray", "2 4")
-    .attr("stroke-linecap", "round")
-    .style("opacity", 0);
-  const duration = 9000 + Math.random() * 4000;
-  trail.transition().duration(duration * 0.25).style("opacity", 0.35);
-
-  plane.interrupt()
-    .style("opacity", 0)
-    .attr("transform", `translate(${pts[0][0]},${pts[0][1]})`)
-    .transition().duration(300).style("opacity", 0.95)
-    .transition().duration(duration).ease(d3.easeCubicInOut)
-      .attrTween("transform", () => (t) => {
-        const f = t * steps;
-        const i = Math.min(steps - 1, Math.floor(f));
-        const [x, y] = pts[i];
-        const [xn, yn] = pts[i + 1];
-        const angle = Math.atan2(yn - y, xn - x) * 180 / Math.PI;
-        return `translate(${x},${y}) rotate(${angle})`;
-      })
-    .transition().duration(500).style("opacity", 0)
-    .on("end", () => {
-      // Fade + remove the trail, then schedule the next hop.
-      trail.transition().duration(3000).style("opacity", 0).remove();
-      schedulePlaneJourney(3000 + Math.random() * 6000);
-    });
-}
-function schedulePlaneJourney(delayMs) {
-  clearTimeout(state._planeTimer);
-  state._planeTimer = setTimeout(flyPlaneJourney, delayMs);
 }
 
 function renderCountries() {
@@ -2757,14 +2574,6 @@ function shuffle(arr) {
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
-}
-
-function applyTheme(name) {
-  state.theme = name;
-  try { localStorage.setItem("we_theme", name); } catch(e) {}
-  document.body.classList.remove("theme-parchment", "theme-antique");
-  if (name === "parchment") document.body.classList.add("theme-parchment");
-  else if (name === "antique") document.body.classList.add("theme-antique");
 }
 
 function isRegionFiltered() {
@@ -4073,11 +3882,6 @@ function wire() {
       if (inGame) inGame.value = String(state.gameLength);
     });
   }
-  const welcomeTheme = $("welcomeTheme");
-  if (welcomeTheme) {
-    welcomeTheme.value = state.theme || "cartographer";
-    welcomeTheme.addEventListener("change", (e) => applyTheme(e.target.value));
-  }
 
   // ----------------------------------------------------------------
   // Start click — fire the greeting synchronously inside the gesture,
@@ -4271,7 +4075,6 @@ async function load() {
   const geo = topojson.feature(topo, topo.objects.countries);
   state.features = geo.features.map(f => ({ ...f, id: String(f.id).padStart(3, "0") }));
   $("loader").style.display = "none";
-  applyTheme(state.theme || "cartographer");
   setupMap();
   renderCountries();
   rebuildPool();
