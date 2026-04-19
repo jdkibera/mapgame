@@ -35,11 +35,27 @@
        separation — same idea as the OldCityPrints reference. */
     --ocean: #F4E7C5;
     --ocean-deep: #D9BD8A;
+    --ocean-shore: #E6D2A0;          /* darker ring near coasts — "depth" */
+    --ocean-hi: #FBF0D4;             /* center of the sea gradient */
     --land: #FAEED0;
     --land-stroke: #4A3320;
     --graticule: #A88C5A;
     --ink-soft: rgba(74, 51, 32, 0.7);
     --paper-edge: #B48A52;
+  }
+  /* Blue-sea variant — same parchment paper, but the water reads as
+     faded indigo/teal like the hand-inked admiralty charts. Kept as
+     a data attribute on <body> so one click swaps the whole map. */
+  body[data-palette="blue"] {
+    --ocean: #D8E4E4;
+    --ocean-deep: #7FA2A6;
+    --ocean-shore: #A9C1C2;
+    --ocean-hi: #E8EEEE;
+    --land: #F5EAC8;
+    --land-stroke: #2C3A45;
+    --graticule: #5F7B82;
+    --ink-soft: rgba(44, 58, 69, 0.7);
+    --paper-edge: #6E8A90;
 
     --good: #6E8B6E;
     --good-soft: #C4D4BC;
@@ -69,7 +85,7 @@
   #mapWrap {
     position: fixed; inset: 0;
     background:
-      radial-gradient(ellipse at 50% 45%, #FDF5DC 0%, var(--ocean) 58%, var(--ocean-deep) 100%);
+      radial-gradient(ellipse at 50% 45%, var(--ocean-hi) 0%, var(--ocean) 58%, var(--ocean-deep) 100%);
   }
   /* Layered paper texture. Two noise tiles at different scales + a
      very soft corner vignette build up an aged-atlas feel: coarse
@@ -100,11 +116,23 @@
      the two filter chains fighting each other. Three stacked drop-
      shadows at increasing blur + fading opacity produce concentric
      brown "ripple" bands fading out from every coastline. */
+  /* Sea-shading halo — three stacked drop-shadows give concentric
+     darker rings around every coastline. Tight inner band reads as
+     shallow-water depth shading; wider outer bands soften into
+     deep-water. Darker than v4 so the depth effect is readable. */
   g.countries-wrap {
     filter:
-      drop-shadow(0 0 1.2px rgba(74, 51, 32, 0.42))
-      drop-shadow(0 0 4px   rgba(140, 98, 46, 0.22))
-      drop-shadow(0 0 12px  rgba(160, 118, 58, 0.09));
+      drop-shadow(0 0 1.2px rgba(74, 51, 32, 0.48))
+      drop-shadow(0 0 3.5px rgba(120, 82, 34, 0.30))
+      drop-shadow(0 0 9px   rgba(140, 98, 46, 0.18))
+      drop-shadow(0 0 20px  rgba(160, 118, 58, 0.08));
+  }
+  body[data-palette="blue"] g.countries-wrap {
+    filter:
+      drop-shadow(0 0 1.2px rgba(44, 58, 69, 0.40))
+      drop-shadow(0 0 3.5px rgba(72, 102, 112, 0.28))
+      drop-shadow(0 0 10px  rgba(92, 128, 138, 0.22))
+      drop-shadow(0 0 22px  rgba(110, 152, 164, 0.10));
   }
   .country {
     fill: var(--land);
@@ -197,16 +225,31 @@
     stroke-linecap: round; stroke-linejoin: round;
     stroke-width: 0.55; stroke-opacity: 0.75;
   }
+  /* Shipping routes in three weight classes — primary (clearest)
+     through tertiary (almost a whisper). Weight is set per-route in
+     drawAtlasDecorations() and translates directly to stroke width +
+     opacity, giving the network a natural ink-variation texture. */
   .deco-route {
     fill: none; stroke: var(--land-stroke);
-    stroke-width: 0.55; stroke-opacity: 0.42;
-    stroke-linecap: round;
+    stroke-linecap: round; stroke-linejoin: round;
   }
-  /* A second ghost pass at slightly lower opacity — imitates the
-     doubled-up pencil stroke of a hand-drawn line. */
+  .deco-route-primary   { stroke-width: 0.60; stroke-opacity: 0.55; }
+  .deco-route-secondary { stroke-width: 0.45; stroke-opacity: 0.38; }
+  .deco-route-tertiary  { stroke-width: 0.35; stroke-opacity: 0.22; }
+  /* A ghost underline pass in matching weight imitates a doubled-up
+     hand-inked line — subtler on tertiary so they stay whisper-thin. */
   .deco-route-ghost {
     fill: none; stroke: var(--land-stroke);
-    stroke-width: 0.35; stroke-opacity: 0.22;
+    stroke-linecap: round; stroke-linejoin: round;
+    stroke-width: 0.35; stroke-opacity: 0.15;
+  }
+  /* Ocean currents — drawn as long faint wavy strokes with a looser
+     dash pattern so they read as swept arrows of flowing water, not
+     route lines. Very low opacity. */
+  .deco-current {
+    fill: none; stroke: var(--land-stroke);
+    stroke-width: 0.45; stroke-opacity: 0.18;
+    stroke-dasharray: 4 2 1 2;
     stroke-linecap: round;
   }
   .deco-rhumb { stroke: var(--land-stroke); stroke-opacity: 0.25; fill: none; stroke-width: 0.3; }
@@ -1476,6 +1519,10 @@
       <option value="Oceans">Oceans</option>
     </select>
   </button>
+  <button class="tbtn" id="paletteBtn" title="Switch ocean palette — parchment ↔ admiralty blue" aria-label="Toggle map palette">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 13h18"/><path d="M12 4a13 13 0 0 1 0 17"/></svg>
+    Palette
+  </button>
   <button class="tbtn danger" id="resetBtn" title="Reset the entire game">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
     Reset
@@ -2259,6 +2306,21 @@ function setupMap() {
   const mapY0 = h / 2 - mapH / 2;
   window._mapBounds = { x0: mapX0, y0: mapY0, w: mapW, h: mapH };
 
+  // Cheap land/ocean lookup used to keep decorations and shipping
+  // routes off of continents. Iterating every country feature per
+  // call is fine — called a few thousand times during setup then
+  // never again. d3.geoContains handles antimeridian wrapping etc.
+  window._isOcean = function(lonlat) {
+    if (!state.features || !lonlat) return true;
+    for (const f of state.features) {
+      if (d3.geoContains(f, lonlat)) return false;
+    }
+    return true;
+  };
+  // Exposed for the Puppeteer placement audit; harmless at runtime.
+  window.projection = projection;
+  window.pathGen = pathGen;
+
   svg.selectAll("*").remove();
 
   // Filters.
@@ -2499,6 +2561,24 @@ function updateAutoZoomUI() {
   btn.title = state.autoZoom ? "Auto-zoom ON — click to turn off" : "Auto-zoom OFF — click to turn on";
 }
 
+// Palette — parchment (default) ↔ admiralty-blue. Driven by a data
+// attribute on <body> so the CSS variable overrides cascade to every
+// element that references them (ocean, halo, countries, decorations).
+function togglePalette() {
+  const cur = document.body.getAttribute("data-palette") || "parchment";
+  const next = cur === "parchment" ? "blue" : "parchment";
+  document.body.setAttribute("data-palette", next);
+  try { localStorage.setItem("we_palette", next); } catch(e) {}
+}
+function applyStoredPalette() {
+  try {
+    const saved = localStorage.getItem("we_palette");
+    if (saved === "blue" || saved === "parchment") {
+      document.body.setAttribute("data-palette", saved);
+    }
+  } catch(e) {}
+}
+
 function recordHistory(id, outcome) {
   state.countryHistory.set(id, outcome);
   const meta = COUNTRIES[id];
@@ -2723,40 +2803,77 @@ function shuffle(arr) {
 }
 
 // ---- Port roster & great-circle helper for shipping routes ----
-// A small roster of historically important steamship hubs; the routes
-// below are (fromKey, toKey) pairs rendered as great-circle arcs via
-// d3.geoInterpolate so they curve the way liner tracks actually curve.
+// Historically important steamship hubs. Ports are slightly offset
+// from the literal city centre so their dots land cleanly in water,
+// not inside the country polygon.
 const PORTS = {
-  NYC:    { ll: [-74.0,  40.7], name: "New York" },
-  LON:    { ll: [ -0.1,  51.5], name: "London" },
-  LIS:    { ll: [ -9.1,  38.7], name: "Lisbon" },
-  CPT:    { ll: [ 18.4, -33.9], name: "Cape Town" },
-  RIO:    { ll: [-43.2, -22.9], name: "Rio" },
-  BUE:    { ll: [-58.4, -34.6], name: "B. Aires" },
-  VAL:    { ll: [-71.6, -33.0], name: "Valparaíso" },
-  PAN:    { ll: [-79.5,   9.0], name: "Panamá" },
-  SFO:    { ll: [-122.4, 37.8], name: "San Francisco" },
-  HON:    { ll: [-157.9, 21.3], name: "Honolulu" },
-  YOK:    { ll: [139.7,  35.4], name: "Yokohama" },
-  HKG:    { ll: [114.2,  22.3], name: "Hong Kong" },
-  SIN:    { ll: [103.8,   1.4], name: "Singapore" },
-  BOM:    { ll: [ 72.8,  19.1], name: "Bombay" },
-  ADE:    { ll: [ 45.0,  12.8], name: "Aden" },
-  SUE:    { ll: [ 32.6,  29.9], name: "Suez" },
-  SYD:    { ll: [151.2, -33.9], name: "Sydney" },
-  AKL:    { ll: [174.8, -36.9], name: "Auckland" },
-  PER:    { ll: [115.9, -32.0], name: "Perth" },
-  MNL:    { ll: [120.9,  14.6], name: "Manila" },
-  VAN:    { ll: [-123.1, 49.3], name: "Vancouver" },
+  NYC: { ll: [-74.0,  40.5], name: "New York" },
+  LON: { ll: [  1.3,  51.5], name: "London" },
+  LIS: { ll: [ -9.5,  38.7], name: "Lisbon" },
+  CPT: { ll: [ 18.5, -34.2], name: "Cape Town" },
+  RIO: { ll: [-43.2, -23.2], name: "Rio" },
+  BUE: { ll: [-57.5, -34.9], name: "B. Aires" },
+  VAL: { ll: [-71.8, -33.1], name: "Valparaíso" },
+  PAN: { ll: [-79.9,   8.9], name: "Panamá" },
+  SFO: { ll: [-122.7, 37.7], name: "San Francisco" },
+  HON: { ll: [-157.9, 21.3], name: "Honolulu" },
+  YOK: { ll: [140.0,  35.0], name: "Yokohama" },
+  HKG: { ll: [114.3,  22.0], name: "Hong Kong" },
+  SIN: { ll: [103.9,   1.2], name: "Singapore" },
+  BOM: { ll: [ 72.6,  18.8], name: "Bombay" },
+  ADE: { ll: [ 45.3,  12.5], name: "Aden" },
+  SUE: { ll: [ 32.7,  29.6], name: "Suez" },
+  SYD: { ll: [151.5, -34.0], name: "Sydney" },
+  AKL: { ll: [175.2, -36.9], name: "Auckland" },
+  PER: { ll: [115.5, -32.3], name: "Perth" },
+  MNL: { ll: [121.1,  14.4], name: "Manila" },
+  VAN: { ll: [-123.5, 49.3], name: "Vancouver" },
 };
 
 // Sample a great-circle arc as a LineString so any projection renders
 // the proper curved track instead of a straight chord in map coords.
-function greatCircleLine(aLL, bLL, steps = 64) {
+function greatCircleLine(aLL, bLL, steps = 48) {
   const interp = d3.geoInterpolate(aLL, bLL);
   const coords = [];
   for (let i = 0; i <= steps; i++) coords.push(interp(i / steps));
+  return coords;
+}
+
+// Resolve a waypoint (either a PORT key like "NYC" or a [lon,lat]
+// literal) to a lon/lat pair.
+function resolveWaypoint(wp) {
+  if (typeof wp === "string") return PORTS[wp] ? PORTS[wp].ll : null;
+  return wp;
+}
+
+// Build a MultiLineString path that threads through every waypoint,
+// with each consecutive pair joined by a great-circle arc. Lets us
+// route a line around land masses (Suez, Malacca, around Africa…)
+// while still getting the natural curvature of a GC track.
+function waypointRoute(waypoints) {
+  const coords = [];
+  for (let i = 0; i < waypoints.length - 1; i++) {
+    const a = resolveWaypoint(waypoints[i]);
+    const b = resolveWaypoint(waypoints[i + 1]);
+    if (!a || !b) return null;
+    const seg = greatCircleLine(a, b, 40);
+    // Avoid duplicating the join point between segments
+    if (i > 0) seg.shift();
+    coords.push(...seg);
+  }
   return { type: "LineString", coordinates: coords };
+}
+
+// Sample the sample-coord list — returns true if any sample lies on
+// land. Used to reject routes that cross continents so we can flag
+// them for fixing rather than render broken tracks.
+function routeCrossesLand(coords, skipEnds = 1) {
+  const fn = window._isOcean;
+  if (!fn) return false;
+  for (let i = skipEnds; i < coords.length - skipEnds; i++) {
+    if (!fn(coords[i])) return true;
+  }
+  return false;
 }
 
 // Paint the static old-atlas ocean furniture. All shapes are drawn as
@@ -2768,31 +2885,121 @@ function drawAtlasDecorations(parent) {
     .attr("class", "decorations")
     .attr("filter", "url(#handSketch)");
   const ink = "var(--land-stroke)";
+  const isOcean = window._isOcean || (() => true);
 
   // ---------- shipping-route network ----------
-  // Classic late-1800s / early-1900s liner routes as great-circle arcs
-  // between PORTS. Each arc is drawn twice (ghost underline + main
-  // stroke) to mimic a doubled-up hand-inked line.
+  // Each route is a polyline of waypoints — some are PORT keys, others
+  // are [lon,lat] literals that steer the track around land masses
+  // (Gibraltar, Cape of Good Hope, Malacca, Torres Strait…). Every
+  // consecutive pair is joined by a great-circle arc and the whole
+  // route gets a weight class (primary / secondary / tertiary) that
+  // controls its stroke width and opacity, so the network reads with
+  // a natural ink-density variation.
   const ROUTES = [
-    ["NYC","LON"], ["LON","LIS"], ["LIS","NYC"],
-    ["LIS","RIO"], ["NYC","RIO"], ["RIO","BUE"],
-    ["NYC","PAN"], ["PAN","SFO"], ["PAN","VAL"],
-    ["SFO","HON"], ["HON","YOK"], ["HON","SYD"],
-    ["YOK","HKG"], ["HKG","MNL"], ["MNL","SIN"],
-    ["HKG","SIN"], ["SIN","BOM"], ["BOM","ADE"],
-    ["ADE","SUE"], ["SUE","LON"],
-    ["LON","CPT"], ["CPT","RIO"], ["CPT","BOM"],
-    ["CPT","PER"], ["PER","SYD"], ["SYD","AKL"],
-    ["SYD","SIN"], ["SFO","VAN"], ["VAN","YOK"],
+    // ---- Transatlantic ----
+    { wp: ["NYC", "LON"], w: "primary" },
+    { wp: ["NYC", "LIS"], w: "secondary" },
+    { wp: ["LON", "LIS"], w: "secondary" },
+    { wp: ["LIS", [-25, 15], "RIO"], w: "secondary" }, // via Cape Verde
+    { wp: ["NYC", [-40, 10], "RIO"], w: "tertiary" },
+    { wp: ["RIO", "BUE"], w: "secondary" },
+
+    // ---- Europe → Africa / India (around the Cape) ----
+    { wp: ["LON", [-10, 36], [-17, 14], [0, -5], [10, -20], "CPT"], w: "primary" },
+    { wp: ["LIS", [-15, 20], [-5, 0], [10, -25], "CPT"], w: "tertiary" },
+
+    // ---- Mediterranean + Suez lane ----
+    { wp: ["LON", [-6, 36], [10, 37], [28, 34], "SUE"], w: "primary" },
+    { wp: ["SUE", "ADE"], w: "primary" },
+    { wp: ["ADE", "BOM"], w: "secondary" },
+    { wp: ["ADE", [60, 8], [80, 5], "SIN"], w: "tertiary" },
+
+    // ---- Indian Ocean ----
+    { wp: ["CPT", "BOM"], w: "secondary" },
+    { wp: ["CPT", [75, -35], "PER"], w: "secondary" },
+    { wp: ["CPT", "BUE"], w: "tertiary" },
+    { wp: ["CPT", "RIO"], w: "secondary" },
+    { wp: ["BOM", [80, 5], "SIN"], w: "primary" }, // south of Sri Lanka
+    { wp: ["BOM", [75, 0], [100, -5], "PER"], w: "tertiary" },
+
+    // ---- SE Asia / Far East ----
+    { wp: ["SIN", "HKG"], w: "primary" },
+    { wp: ["SIN", "MNL"], w: "secondary" },
+    { wp: ["HKG", "MNL"], w: "secondary" },
+    { wp: ["HKG", "YOK"], w: "primary" },
+    { wp: ["MNL", "YOK"], w: "tertiary" },
+
+    // ---- Pacific ----
+    { wp: ["YOK", "HON"], w: "secondary" },
+    { wp: ["YOK", "SFO"], w: "primary" },
+    { wp: ["HON", "SFO"], w: "primary" },
+    { wp: ["HON", [175, -10], "SYD"], w: "secondary" },
+    { wp: ["HON", [175, -10], "AKL"], w: "tertiary" },
+    { wp: ["VAL", [-170, -40], "AKL"], w: "tertiary" },
+    { wp: ["SFO", "VAN"], w: "secondary" },
+    { wp: ["VAN", "YOK"], w: "secondary" },
+
+    // ---- Americas (Pacific side) ----
+    { wp: ["SFO", "PAN"], w: "secondary" },
+    { wp: ["PAN", "VAL"], w: "secondary" },
+    { wp: ["PAN", "NYC"], w: "secondary" },
+
+    // ---- Australia / Oceania ----
+    { wp: ["SYD", "AKL"], w: "secondary" },
+    { wp: ["SYD", [146, -43], [130, -39], "PER"], w: "secondary" }, // S of Tasmania
+    { wp: ["SYD", [156, -28], [150, -20], [144, -10], [128, -5], [114, 0], "SIN"], w: "secondary" }, // Coral Sea → Torres → Java
+    { wp: ["PER", [100, -20], "SIN"], w: "tertiary" },
+
+    // ---- Great Southern Ocean ----
+    { wp: ["CPT", [80, -40], "SYD"], w: "tertiary" },
   ];
-  ROUTES.forEach(([a, b]) => {
-    const pa = PORTS[a], pb = PORTS[b];
-    if (!pa || !pb) return;
-    const line = greatCircleLine(pa.ll, pb.ll, 60);
-    // ghost underline — a little offset comes "for free" from the
-    // handSketch displacement filter, so this is pure tonal doubling
+
+  ROUTES.forEach(r => {
+    const line = waypointRoute(r.wp);
+    if (!line) return;
+    if (routeCrossesLand(line.coordinates, 2)) {
+      // Dev-time belt-and-suspenders: if a route still passes over
+      // land, render it tertiary-faint so the "oops it's on land"
+      // doesn't scream; this also surfaces routes needing waypoints.
+      r.w = "tertiary";
+    }
     g.append("path").datum(line).attr("class", "deco-route-ghost").attr("d", pathGen);
-    g.append("path").datum(line).attr("class", "deco-route").attr("d", pathGen);
+    g.append("path").datum(line).attr("class", "deco-route deco-route-" + r.w).attr("d", pathGen);
+  });
+
+  // ---------- ocean currents ----------
+  // Faint dashed wavy strokes that suggest the major gyres. Each
+  // current is a sampled sine wave along a bearing — the sketch
+  // filter wobbles it further so it reads as a hand-drawn arrow of
+  // drifting water, not a shipping route.
+  function currentLine(startLL, endLL, amp, cycles) {
+    const coords = [];
+    const steps = 60;
+    const dLon = endLL[0] - startLL[0], dLat = endLL[1] - startLL[1];
+    const len = Math.hypot(dLon, dLat) || 1;
+    const nx = -dLat / len, ny = dLon / len; // perpendicular unit
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const offset = Math.sin(t * Math.PI * cycles) * amp;
+      coords.push([
+        startLL[0] + dLon * t + nx * offset,
+        startLL[1] + dLat * t + ny * offset,
+      ]);
+    }
+    return { type: "LineString", coordinates: coords };
+  }
+  const CURRENTS = [
+    [[-78, 25], [-35, 50], 2.5, 3],  // Gulf Stream → NE Atlantic
+    [[-10, 5], [-30, -25], 3, 3],   // S Atlantic / Benguela flank
+    [[140, 35], [-170, 48], 3, 3],  // Kuroshio → N Pacific drift
+    [[100, -8], [60, -20], 2.5, 3], // S Equatorial Indian
+    [[-150, -45], [-50, -52], 3, 3], // ACC south-Pacific stretch
+    [[ 20, -45], [ 120, -48], 3, 3], // ACC south-Indian stretch
+  ];
+  CURRENTS.forEach(([a, b, amp, cyc]) => {
+    const line = currentLine(a, b, amp, cyc);
+    if (routeCrossesLand(line.coordinates, 4)) return;
+    g.append("path").datum(line).attr("class", "deco-current").attr("d", pathGen);
   });
 
   // ---------- port dots + labels ----------
@@ -2898,84 +3105,285 @@ function drawAtlasDecorations(parent) {
       .attr("stroke-width", 0.35).attr("stroke-opacity", 0.5);
   }
 
-  // ---------- whales ---------- sketched silhouettes, outlined not filled
-  const whales = [
-    { lonlat: [ 160,  28], scale: 1.2, rot:  -6 }, // North Pacific
-    { lonlat: [-145,  12], scale: 1.0, rot:   2 }, // Mid Pacific
-    { lonlat: [  95, -40], scale: 1.2, rot:  -4 }, // Southern Indian
-    { lonlat: [-130, -50], scale: 1.3, rot:  -6 }, // Southern Pacific
-    { lonlat: [  25, -52], scale: 1.1, rot:  10 }, // South Atlantic / southern ocean
-    { lonlat: [ 178,  -8], scale: 0.9, rot:  -2 }, // SW Pacific near Samoa
+  // ---------- helper: only place if over ocean ----------
+  function placeIfOcean(lonlat, offsetFallback) {
+    let ll = lonlat;
+    if (!isOcean(ll)) {
+      // Try a few small nudges before giving up — keeps hand-tuned
+      // positions that accidentally sit a pixel onshore from being
+      // dropped completely.
+      const tries = offsetFallback || [
+        [ 2, 0], [-2, 0], [ 0, 2], [ 0,-2],
+        [ 3, 3], [-3, 3], [ 3,-3], [-3,-3],
+      ];
+      for (const [dx, dy] of tries) {
+        const cand = [lonlat[0] + dx, lonlat[1] + dy];
+        if (isOcean(cand)) { ll = cand; break; }
+      }
+      if (!isOcean(ll)) return null;
+    }
+    return projection(ll);
+  }
+
+  // ---------- WHALES ---------- three body types for variety
+  const whaleBaleen = (sel) => {       // long-bodied baleen whale (default)
+    sel.append("path").attr("class", "deco-ink").attr("stroke-width", 0.55)
+      .attr("d", "M-13,0 C-10,-3.5 -3,-4 3,-3 C7,-2.5 11,-1.5 13,0");
+    sel.append("path").attr("class", "deco-ink").attr("stroke-width", 0.5).attr("stroke-opacity", 0.7)
+      .attr("d", "M-13,0 C-10,3.5 -3,4 3,3 C7,2.5 11,1.5 13,0");
+    sel.append("path").attr("class", "deco-ink").attr("stroke-width", 0.5)
+      .attr("d", "M-13,0 L-18,-3 L-15,0 L-18,3 Z");  // fluke
+    sel.append("path").attr("class", "deco-ink").attr("stroke-width", 0.35).attr("stroke-opacity", 0.65)
+      .attr("d", "M3,-3 q-0.5,-2 0,-4 q0.6,-1.5 -0.2,-3  M1.2,-3 q-0.4,-2 0.2,-3.5");  // plume
+    sel.append("circle").attr("cx", 9).attr("cy", -0.2).attr("r", 0.25).attr("fill", ink);
+  };
+  const whaleSperm = (sel) => {        // blocky-headed sperm whale
+    sel.append("path").attr("class", "deco-ink").attr("stroke-width", 0.6)
+      .attr("d", "M-11,0 C-9,-4 -3,-4.5 3,-3.5 L10,-2 Q14,-1 13,0");
+    sel.append("path").attr("class", "deco-ink").attr("stroke-width", 0.55).attr("stroke-opacity", 0.75)
+      .attr("d", "M-11,0 C-9,3.5 -3,3.8 3,3.2 L10,2 Q14,1 13,0");
+    sel.append("path").attr("class", "deco-ink").attr("stroke-width", 0.5)
+      .attr("d", "M-11,0 L-16,-3 L-13,0 L-16,3 Z");
+    sel.append("path").attr("class", "deco-ink").attr("stroke-width", 0.35).attr("stroke-opacity", 0.55)
+      .attr("d", "M9,-2.5 q-1,-2 0.5,-4");   // angled spout (sperm whale blow)
+    sel.append("circle").attr("cx", 8.5).attr("cy", -0.2).attr("r", 0.26).attr("fill", ink);
+  };
+  const whaleBreach = (sel) => {       // humpback partially out of water
+    sel.append("path").attr("class", "deco-ink").attr("stroke-width", 0.6)
+      .attr("d", "M-8,4 C-6,-2 0,-7 6,-6 L9,-4 Q11,-2.5 10,-1");
+    sel.append("path").attr("class", "deco-ink").attr("stroke-width", 0.5)
+      .attr("d", "M-8,4 Q-5,5 -2,4");  // belly-out-of-water arc
+    sel.append("path").attr("class", "deco-ink").attr("stroke-width", 0.4)   // pectoral fin
+      .attr("d", "M1,-3 Q5,-1 4,3 Q3,4 1,3");
+    sel.append("path").attr("class", "deco-ink").attr("stroke-width", 0.35).attr("stroke-opacity", 0.5)
+      .attr("d", "M-10,5 q-4,0 -8,1 M-10,6 q-3,0.5 -6,1.5"); // splash
+    sel.append("circle").attr("cx", 7).attr("cy", -3.4).attr("r", 0.25).attr("fill", ink);
+  };
+  const WHALES = [
+    { lonlat: [ 162,  28], s: 1.2, r:  -6, shape: whaleBaleen },
+    { lonlat: [-150,  10], s: 1.1, r:   2, shape: whaleSperm  },
+    { lonlat: [ 100, -42], s: 1.1, r:  -4, shape: whaleBaleen },
+    { lonlat: [-130, -48], s: 1.3, r:  -6, shape: whaleSperm  },
+    { lonlat: [  25, -50], s: 1.1, r:  10, shape: whaleBreach },
+    { lonlat: [ 170,  -6], s: 0.9, r:  -2, shape: whaleBaleen },
+    { lonlat: [-165,  40], s: 1.0, r:  -3, shape: whaleBreach },
+    { lonlat: [-45, -40],  s: 1.1, r:   4, shape: whaleSperm  },
+    { lonlat: [  55, -30], s: 0.9, r:  -3, shape: whaleBaleen },
   ];
-  whales.forEach(w => {
-    const pt = projection(w.lonlat);
+  WHALES.forEach(w => {
+    const pt = placeIfOcean(w.lonlat);
     if (!pt) return;
     const wg = g.append("g")
       .attr("class", "deco-whale")
-      .attr("transform", `translate(${pt[0]}, ${pt[1]}) rotate(${w.rot}) scale(${w.scale})`);
-    // Body — top curve + belly curve as separate strokes
-    wg.append("path").attr("class", "deco-ink").attr("stroke-width", 0.55)
-      .attr("d", "M-12,0 C-9,-3.5 -3,-4 3,-3 C7,-2.5 10,-1.5 12,0");
-    wg.append("path").attr("class", "deco-ink").attr("stroke-width", 0.5).attr("stroke-opacity", 0.7)
-      .attr("d", "M-12,0 C-9,3.5 -3,4 3,3 C7,2.5 10,1.5 12,0");
-    // Tail fluke — classic two-lobed whale tail, drawn as strokes
-    wg.append("path").attr("class", "deco-ink").attr("stroke-width", 0.5)
-      .attr("d", "M-12,0 L-17,-3 L-14,0 L-17,3 Z");
-    // Blowhole plume (two short wavy strokes)
-    wg.append("path").attr("class", "deco-ink").attr("stroke-width", 0.35).attr("stroke-opacity", 0.65)
-      .attr("d", "M3,-3 q-0.5,-2 0,-4 q0.6,-1.5 -0.2,-3  M1.2,-3 q-0.4,-2 0.2,-3.5");
-    // Eye dot
-    wg.append("circle").attr("cx", 8).attr("cy", -0.2).attr("r", 0.25).attr("fill", ink);
+      .attr("transform", `translate(${pt[0]}, ${pt[1]}) rotate(${w.r}) scale(${w.s})`);
+    w.shape(wg);
   });
 
-  // ---------- tall ships ---------- line-only sketches
-  const ships = [
-    { lonlat: [-40,  48], scale: 1.4, rot:  -2 }, // N Atlantic
-    { lonlat: [ 65,   0], scale: 1.3, rot:   3 }, // Indian Ocean
-    { lonlat: [-115, -22], scale: 1.3, rot:   2 }, // E Pacific
-    { lonlat: [ 170,  18], scale: 1.2, rot:  -4 }, // Mid-Pacific
-    { lonlat: [-50, -26], scale: 1.3, rot:   3 }, // S Atlantic
-    { lonlat: [ 135, -20], scale: 1.1, rot:  -3 }, // Coral Sea
+  // ---------- SEA CREATURES ---------- turtles, dolphins, dragons, mermaid, kraken
+  // All are sketch-style open-stroke shapes — same ink, same feel.
+  const turtle = (sel) => {
+    sel.append("ellipse").attr("class", "deco-ink").attr("cx", 0).attr("cy", 0)
+      .attr("rx", 6).attr("ry", 4.2).attr("stroke-width", 0.6);
+    // Hex scales on the shell
+    [[-2.5,-1],[0.5,-1.2],[3,-0.5],[-2,1.5],[1,1.5],[3.2,1.2]].forEach(([x,y]) =>
+      sel.append("path").attr("class","deco-ink").attr("stroke-width", 0.3).attr("stroke-opacity", 0.55)
+        .attr("d", `M${x-1},${y} L${x},${y-1} L${x+1},${y} L${x},${y+1} Z`)
+    );
+    // Head
+    sel.append("path").attr("class","deco-ink").attr("stroke-width", 0.5)
+      .attr("d", "M6,0 q2,-0.5 3,0 q-0.5,1 -3,0.8 Z");
+    // Four flippers
+    [[-4,-4,-6,-5],[3,-4,5,-5],[-4,4,-6,5],[3,4,5,5]].forEach(([x1,y1,x2,y2]) =>
+      sel.append("path").attr("class","deco-ink").attr("stroke-width", 0.45)
+        .attr("d", `M${x1},${y1} Q${(x1+x2)/2-0.5},${(y1+y2)/2} ${x2},${y2}`)
+    );
+    // Tail nub
+    sel.append("line").attr("class", "deco-ink").attr("stroke-width", 0.35)
+      .attr("x1", -6).attr("y1", 0).attr("x2", -7.5).attr("y2", 0.4);
+    sel.append("circle").attr("cx", 7.8).attr("cy", 0.1).attr("r", 0.25).attr("fill", ink); // eye
+  };
+  const dolphin = (sel) => {
+    // Leaping dolphin — arched back + crescent tail
+    sel.append("path").attr("class", "deco-ink").attr("stroke-width", 0.55)
+      .attr("d", "M-10,2 C-8,-5 2,-6 9,-2 L11,0");         // back
+    sel.append("path").attr("class", "deco-ink").attr("stroke-width", 0.5).attr("stroke-opacity", 0.75)
+      .attr("d", "M-10,2 C-6,4 3,2.5 9,0");                  // belly
+    sel.append("path").attr("class", "deco-ink").attr("stroke-width", 0.45)
+      .attr("d", "M-10,2 L-13,-1 L-11,2 L-13,5 Z");          // tail
+    sel.append("path").attr("class", "deco-ink").attr("stroke-width", 0.4)
+      .attr("d", "M0,-4.5 l1.5,-2 l1,2");                    // dorsal fin
+    sel.append("circle").attr("cx", 8).attr("cy", -0.6).attr("r", 0.25).attr("fill", ink);
+  };
+  const seaDragon = (sel) => {   // eastern-dragon style — long mane + whiskers
+    const bodyD = "M-32,2 C-26,-5 -18,-6 -12,-2 C-6,2 -2,-3 4,-4 C10,-5 14,-2 18,2 C22,6 26,4 30,0";
+    sel.append("path").attr("class","deco-ink").attr("stroke-width", 0.6).attr("d", bodyD);
+    sel.append("path").attr("class","deco-ink").attr("stroke-width", 0.45).attr("stroke-opacity", 0.6)
+      .attr("d", bodyD).attr("transform", "translate(0,1.2)");
+    // Flame-like mane along the back
+    [-24,-16,-8,0,8,16,24].forEach(x => sel.append("path").attr("class","deco-ink")
+      .attr("stroke-width", 0.45)
+      .attr("d", `M${x},-3 q0.5,-3 1.5,-4 q-0.8,3.5 -1.5,3.5 Z`));
+    // Head horns + whiskers
+    sel.append("path").attr("class","deco-ink").attr("stroke-width", 0.5)
+      .attr("d", "M30,0 q3,-1 3,-4  M30,0 q3,-0.5 4,-2  M31,1 q3,2 6,2  M31,2 q3,3 6,4");
+    sel.append("circle").attr("cx", 32).attr("cy", -1).attr("r", 0.3).attr("fill", ink);
+    // Tail curl
+    sel.append("path").attr("class","deco-ink").attr("stroke-width", 0.5)
+      .attr("d", "M-32,2 q-5,0 -5,4 q2,1 3,-1");
+  };
+  const mermaid = (sel) => {
+    sel.append("circle").attr("class", "deco-ink").attr("cx", 0).attr("cy", -5)
+      .attr("r", 1.2).attr("stroke-width", 0.5);                       // head
+    sel.append("path").attr("class","deco-ink").attr("stroke-width", 0.5)
+      .attr("d", "M-2,-3 Q0,-1 2,-3 M0,-4 L0,-1");                     // body + arm hint
+    sel.append("path").attr("class", "deco-ink").attr("stroke-width", 0.5)
+      .attr("d", "M-2,0 Q0,2 2,0 Q3,3 1,6 Q-1,9 -2,7 Q-3,4 -2,0 Z");  // curvy tail
+    sel.append("path").attr("class", "deco-ink").attr("stroke-width", 0.45)
+      .attr("d", "M-1,7 q-3,1 -4,3 M-1,7 q-3,2 -3,4 M1,7 q3,1 4,3");   // tail fluke
+    sel.append("path").attr("class", "deco-ink").attr("stroke-width", 0.35).attr("stroke-opacity", 0.6)
+      .attr("d", "M-3,-5 q-2,2 -3,5  M3,-5 q2,2 3,5");                 // flowing hair
+  };
+  const kraken = (sel) => {
+    // Round mantle + eye ring
+    sel.append("circle").attr("class","deco-ink").attr("r", 3.2).attr("stroke-width", 0.55);
+    sel.append("circle").attr("class","deco-ink").attr("r", 1.1).attr("stroke-width", 0.35)
+      .attr("stroke-opacity", 0.6);
+    sel.append("circle").attr("cx", 0).attr("cy", 0).attr("r", 0.35).attr("fill", ink);
+    // Eight curling tentacles
+    for (let i = 0; i < 8; i++) {
+      const a = (i * Math.PI * 2) / 8 + Math.PI / 8;
+      const r0 = 3.2, r1 = 8 + (i % 2) * 2;
+      const x0 = Math.cos(a) * r0, y0 = Math.sin(a) * r0;
+      const x1 = Math.cos(a) * r1, y1 = Math.sin(a) * r1;
+      const cx = Math.cos(a + 0.9) * (r1 * 0.7);
+      const cy = Math.sin(a + 0.9) * (r1 * 0.7);
+      sel.append("path").attr("class","deco-ink").attr("stroke-width", 0.5)
+        .attr("d", `M${x0},${y0} Q${cx},${cy} ${x1},${y1}`);
+    }
+  };
+
+  const CREATURES = [
+    // turtles
+    { lonlat: [-22, 12],   s: 1.0,  r:   5, shape: turtle },
+    { lonlat: [  88, -6],  s: 1.1,  r:  -8, shape: turtle },
+    { lonlat: [-135, 2],   s: 0.9,  r:  -3, shape: turtle },
+    // dolphins
+    { lonlat: [ -50,  30], s: 1.0,  r:  -4, shape: dolphin },
+    { lonlat: [  45,   0], s: 1.0,  r:   5, shape: dolphin },
+    { lonlat: [ 155,   0], s: 1.0,  r:  -2, shape: dolphin },
+    { lonlat: [-170, -30], s: 0.9,  r:   6, shape: dolphin },
+    // sea dragons (eastern-style, in addition to the mid-Atlantic serpent)
+    { lonlat: [ 150,  22], s: 0.8,  r:   8, shape: seaDragon },  // Philippine Sea
+    { lonlat: [  75, -18], s: 0.75, r:  -5, shape: seaDragon },  // Indian Ocean
+    // mermaid
+    { lonlat: [-100, -18], s: 1.2,  r:  -5, shape: mermaid },
+    // kraken
+    { lonlat: [ -35,  45], s: 1.1,  r:   0, shape: kraken },     // N Atlantic
+    { lonlat: [ 140, -50], s: 0.9,  r:   0, shape: kraken },     // Southern Ocean
   ];
-  ships.forEach(s => {
-    const pt = projection(s.lonlat);
+  CREATURES.forEach(c => {
+    const pt = placeIfOcean(c.lonlat);
+    if (!pt) return;
+    const cg = g.append("g").attr("class", "deco-creature")
+      .attr("transform", `translate(${pt[0]}, ${pt[1]}) rotate(${c.r}) scale(${c.s})`);
+    c.shape(cg);
+  });
+
+  // ---------- SHIPS ---------- three types (galleon, schooner, steamer)
+  const shipGalleon = (sg) => {
+    sg.append("path").attr("class", "deco-ink").attr("stroke-width", 0.6)
+      .attr("d", "M-10,1.8 L-7.5,5.5 L7.5,5.5 L10,1.8");  // hull
+    sg.append("line").attr("class", "deco-ink").attr("stroke-width", 0.45)
+      .attr("x1", -9).attr("y1", 1.8).attr("x2", 9).attr("y2", 1.8);
+    sg.append("line").attr("class", "deco-ink").attr("stroke-width", 0.45)
+      .attr("x1", 10).attr("y1", 1.8).attr("x2", 14).attr("y2", 0.5);
+    [-5, 0, 5].forEach((x, i) => {
+      const h = [8.5, 11, 8.5][i];
+      sg.append("line").attr("class", "deco-ink").attr("stroke-width", 0.45)
+        .attr("x1", x).attr("y1", 1.8).attr("x2", x).attr("y2", -h);
+    });
+    [[-5,-4,5],[0,-5.5,5],[5,-4,5],[0,-9,3]].forEach(([mx,my,w]) => {
+      sg.append("line").attr("class", "deco-ink").attr("stroke-width", 0.4)
+        .attr("x1", mx - w/2).attr("y1", my).attr("x2", mx + w/2).attr("y2", my);
+    });
+    sg.append("path").attr("class", "deco-ink").attr("stroke-width", 0.35).attr("stroke-opacity", 0.55)
+      .attr("d", "M-7.5,-4 Q-5,-1 -2.5,-4 M-2.5,-5.5 Q0,-2.5 2.5,-5.5 M2.5,-4 Q5,-1 7.5,-4");
+    sg.append("path").attr("class", "deco-ink").attr("stroke-width", 0.45)
+      .attr("d", "M0,-11 L3,-10 L0,-9.2");
+    sg.append("path").attr("class", "deco-ink").attr("stroke-width", 0.3).attr("stroke-opacity", 0.42)
+      .attr("d", "M-11,4.5 q-5,-0.5 -11,1");
+  };
+  const shipSchooner = (sg) => {
+    // Small 2-mast gaff schooner
+    sg.append("path").attr("class", "deco-ink").attr("stroke-width", 0.55)
+      .attr("d", "M-7,1.5 L-5,4 L6,4 L8,1.5");
+    sg.append("line").attr("class", "deco-ink").attr("stroke-width", 0.4)
+      .attr("x1", -6).attr("y1", 1.5).attr("x2", 7).attr("y2", 1.5);
+    sg.append("line").attr("class", "deco-ink").attr("stroke-width", 0.4)   // bowsprit
+      .attr("x1", 8).attr("y1", 1.5).attr("x2", 11).attr("y2", 0.5);
+    [-3, 4].forEach(x => sg.append("line").attr("class", "deco-ink").attr("stroke-width", 0.4)
+      .attr("x1", x).attr("y1", 1.5).attr("x2", x).attr("y2", -8));
+    // Gaff sails — triangles between masts and deck
+    sg.append("path").attr("class", "deco-ink").attr("stroke-width", 0.4)
+      .attr("d", "M-3,-7 L-3,0 L2,0 Z");
+    sg.append("path").attr("class", "deco-ink").attr("stroke-width", 0.4)
+      .attr("d", "M4,-7 L4,0 L9,0 Z");
+    // Jib sail off the bowsprit
+    sg.append("path").attr("class", "deco-ink").attr("stroke-width", 0.35)
+      .attr("d", "M11,0.5 L8,-3 L4,-7");
+    sg.append("path").attr("class", "deco-ink").attr("stroke-width", 0.3).attr("stroke-opacity", 0.45)
+      .attr("d", "M-7,3.2 q-3,-0.5 -7,0.8");
+  };
+  const shipSteamer = (sg) => {
+    // Long low hull, single tall funnel, two short pole masts
+    sg.append("path").attr("class", "deco-ink").attr("stroke-width", 0.6)
+      .attr("d", "M-12,1.5 L-11,3.5 L11,3.5 L12,1.5");
+    sg.append("line").attr("class", "deco-ink").attr("stroke-width", 0.4)
+      .attr("x1", -12).attr("y1", 1.5).attr("x2", 12).attr("y2", 1.5);
+    // Superstructure
+    sg.append("path").attr("class","deco-ink").attr("stroke-width", 0.45)
+      .attr("d", "M-4,1.5 L-4,-2 L4,-2 L4,1.5");
+    // Funnel + smoke
+    sg.append("path").attr("class","deco-ink").attr("stroke-width", 0.5)
+      .attr("d", "M0.5,-2 L0.5,-6 L-1.5,-6 L-1.5,-2");
+    sg.append("path").attr("class","deco-ink").attr("stroke-width", 0.4).attr("stroke-opacity", 0.55)
+      .attr("d", "M-0.5,-6 q-1,-2 1,-3 q2,-1 0,-3 q-2,-1 1,-3");   // smoke plume
+    // Pole masts (short)
+    [-8, 8].forEach(x => sg.append("line").attr("class","deco-ink").attr("stroke-width", 0.4)
+      .attr("x1", x).attr("y1", 1.5).attr("x2", x).attr("y2", -5));
+    // Flag on aft mast
+    sg.append("path").attr("class","deco-ink").attr("stroke-width", 0.4)
+      .attr("d", "M-8,-5 L-5,-4 L-8,-3.2");
+    // Wake
+    sg.append("path").attr("class", "deco-ink").attr("stroke-width", 0.3).attr("stroke-opacity", 0.4)
+      .attr("d", "M-12,3 q-6,0 -12,1  M-12,4 q-5,0.7 -10,2");
+  };
+
+  const SHIPS = [
+    // Galleons (3-mast square-riggers) — the canonical "tall ship"
+    { lonlat: [ -42,  48], s: 1.3, r:  -2, shape: shipGalleon },  // N Atlantic
+    { lonlat: [ -52, -30], s: 1.2, r:   3, shape: shipGalleon },  // S Atlantic
+    { lonlat: [  68,   0], s: 1.3, r:   3, shape: shipGalleon },  // Arabian Sea
+    { lonlat: [ 170,  18], s: 1.1, r:  -4, shape: shipGalleon },  // Mid-Pacific
+    // Schooners (smaller coastal + whalers)
+    { lonlat: [-120,  28], s: 1.0, r:  -3, shape: shipSchooner }, // E Pacific
+    { lonlat: [ -28,  22], s: 1.0, r:   2, shape: shipSchooner }, // Atlantic mid
+    { lonlat: [ 108,  30], s: 1.0, r:  -5, shape: shipSchooner }, // East China Sea
+    { lonlat: [ 157, -38], s: 0.95, r:   4, shape: shipSchooner }, // Tasman Sea
+    { lonlat: [ -72,  20], s: 0.95, r:  -4, shape: shipSchooner }, // Caribbean
+    // Steamers (19thC liners)
+    { lonlat: [-140,  45], s: 1.2, r:  -2, shape: shipSteamer },  // N Pacific
+    { lonlat: [  80,  12], s: 1.1, r:   2, shape: shipSteamer },  // Arabian Sea
+    { lonlat: [-120,  -8], s: 1.1, r:   3, shape: shipSteamer },  // E Pacific tropics
+    { lonlat: [ 140, -18], s: 1.0, r:  -3, shape: shipSteamer },  // Coral Sea
+  ];
+  SHIPS.forEach(sh => {
+    const pt = placeIfOcean(sh.lonlat);
     if (!pt) return;
     const sg = g.append("g")
       .attr("class", "deco-ship")
-      .attr("transform", `translate(${pt[0]}, ${pt[1]}) rotate(${s.rot}) scale(${s.scale})`);
-    // Hull — open outline instead of filled triangle
-    sg.append("path").attr("class", "deco-ink").attr("stroke-width", 0.6)
-      .attr("d", "M-10,1.8 L-7.5,5.5 L7.5,5.5 L10,1.8");
-    // Deck / waterline
-    sg.append("line").attr("class", "deco-ink")
-      .attr("x1", -9).attr("y1", 1.8).attr("x2", 9).attr("y2", 1.8)
-      .attr("stroke-width", 0.45);
-    // Bowsprit
-    sg.append("line").attr("class", "deco-ink")
-      .attr("x1", 10).attr("y1", 1.8).attr("x2", 14).attr("y2", 0.5)
-      .attr("stroke-width", 0.45);
-    // Three masts
-    [-5, 0, 5].forEach((x, i) => {
-      const h = [8.5, 11, 8.5][i];
-      sg.append("line").attr("class", "deco-ink")
-        .attr("x1", x).attr("y1", 1.8).attr("x2", x).attr("y2", -h)
-        .attr("stroke-width", 0.45);
-    });
-    // Sail yards (horizontal crosspieces) — just lines, no rectangles
-    [[-5,-4,5],[0,-5.5,5],[5,-4,5],[0,-9,3]].forEach(([mx,my,w]) => {
-      sg.append("line").attr("class", "deco-ink")
-        .attr("x1", mx - w/2).attr("y1", my).attr("x2", mx + w/2).attr("y2", my)
-        .attr("stroke-width", 0.4);
-    });
-    // Sail bellies — thin curve between yard and deck
-    sg.append("path").attr("class", "deco-ink").attr("stroke-width", 0.35).attr("stroke-opacity", 0.55)
-      .attr("d", "M-7.5,-4 Q-5,-1 -2.5,-4 M-2.5,-5.5 Q0,-2.5 2.5,-5.5 M2.5,-4 Q5,-1 7.5,-4");
-    // Pennant off the mainmast
-    sg.append("path").attr("class", "deco-ink").attr("stroke-width", 0.45)
-      .attr("d", "M0,-11 L3,-10 L0,-9.2");
-    // Faint wake aft of the stern
-    sg.append("path").attr("class", "deco-ink").attr("stroke-width", 0.3).attr("stroke-opacity", 0.42)
-      .attr("d", "M-11,4.5 q-5,-0.5 -11,1  M-11,5.5 q-4,0.7 -9,2");
+      .attr("transform", `translate(${pt[0]}, ${pt[1]}) rotate(${sh.r}) scale(${sh.s})`);
+    sh.shape(sg);
   });
 
   // ---------- wave scallops ---------- (tiny ink curls in empty water)
@@ -2988,7 +3396,7 @@ function drawAtlasDecorations(parent) {
     { lonlat: [  -5,  58], rot: -2 }, { lonlat: [ 150,  48], rot:  2 },
   ];
   scallops.forEach(s => {
-    const pt = projection(s.lonlat);
+    const pt = placeIfOcean(s.lonlat);
     if (!pt) return;
     g.append("path").attr("class", "deco-ink")
       .attr("d", scallopPath)
@@ -3018,30 +3426,35 @@ function drawAtlasDecorations(parent) {
     }
   }
 
-  // ---------- title cartouche inside the map, Southern Ocean ----------
-  // Sits in the empty Pacific/South-Atlantic latitudes well below any
-  // continent; no more competing with the bottom frame edge.
-  const cartLL = projection([-90, -55]);
-  if (cartLL) {
+  // ---------- title cartouche, top-centre, integrated with the frame ----------
+  // Sits astride the top frame rule — half above the map, half below —
+  // so the frame appears to thread through it. The banner's background
+  // fill matches the ocean so the frame rule underneath is masked out.
+  if (b) {
+    const cx = b.x0 + b.w / 2;
+    const cy = b.y0;                           // on the top frame line
     const cart = g.append("g").attr("class", "deco-cartouche")
-      .attr("transform", `translate(${cartLL[0]}, ${cartLL[1]}) scale(1.45)`);
-    // Hairline banner rule (top + bottom)
-    cart.append("line").attr("class", "deco-ink")
-      .attr("x1", -70).attr("y1", -11).attr("x2", 70).attr("y2", -11)
-      .attr("stroke-width", 0.35).attr("stroke-opacity", 0.45);
-    cart.append("line").attr("class", "deco-ink")
-      .attr("x1", -70).attr("y1", 11).attr("x2", 70).attr("y2", 11)
-      .attr("stroke-width", 0.35).attr("stroke-opacity", 0.45);
+      .attr("transform", `translate(${cx}, ${cy})`);
+    // Opaque background panel (matches ocean) so the frame rule under
+    // it doesn't bleed through the text
+    cart.append("rect")
+      .attr("x", -96).attr("y", -17).attr("width", 192).attr("height", 34)
+      .attr("fill", "var(--ocean-hi)").attr("stroke", "none");
+    // Double-ruled panel outline — the signature "plaque on the frame" look
+    cart.append("rect").attr("class", "map-frame-outer")
+      .attr("x", -96).attr("y", -17).attr("width", 192).attr("height", 34);
+    cart.append("rect").attr("class", "map-frame-inner")
+      .attr("x", -92).attr("y", -13).attr("width", 184).attr("height", 26);
     cart.append("text").attr("class", "deco-cartouche-text")
-      .attr("font-size", 11).attr("y", 0).text("MAP OF · THE WORLD");
+      .attr("font-size", 11).attr("y", -2).text("MAP OF · THE WORLD");
     cart.append("text").attr("class", "deco-cartouche-text")
-      .attr("font-size", 5).attr("y", 8).attr("opacity", 0.6)
-      .text("drawn for young voyagers");
-    // Tiny flourishes off each end
-    cart.append("path").attr("class", "deco-ink").attr("stroke-width", 0.35).attr("stroke-opacity", 0.55)
-      .attr("d", "M-70,-11 q-6,0 -8,4 M-70,11 q-6,0 -8,-4");
-    cart.append("path").attr("class", "deco-ink").attr("stroke-width", 0.35).attr("stroke-opacity", 0.55)
-      .attr("d", "M70,-11 q6,0 8,4 M70,11 q6,0 8,-4");
+      .attr("font-size", 5).attr("y", 9).attr("opacity", 0.62)
+      .text("DRAWN FOR YOUNG VOYAGERS");
+    // Flourish finials off each end of the plaque
+    cart.append("path").attr("class", "deco-ink").attr("stroke-width", 0.45).attr("stroke-opacity", 0.65)
+      .attr("d", "M-96,0 L-106,-6 L-100,0 L-106,6  M-96,-17 q-4,0 -6,-3  M-96,17 q-4,0 -6,3");
+    cart.append("path").attr("class", "deco-ink").attr("stroke-width", 0.45).attr("stroke-opacity", 0.65)
+      .attr("d", "M96,0 L106,-6 L100,0 L106,6  M96,-17 q4,0 6,-3  M96,17 q4,0 6,3");
   }
 }
 
@@ -4424,6 +4837,7 @@ function wire() {
   $("flagBtn").addEventListener("click", toggleFlagMode);
   $("pauseBtn").addEventListener("click", togglePause);
   $("zoomToggleBtn").addEventListener("click", toggleAutoZoom);
+  $("paletteBtn").addEventListener("click", togglePalette);
   $("triesRow").addEventListener("click", onAdvanceTap);
   $("triesRow").addEventListener("keydown", (e) => {
     if (e.key === "Enter" || e.key === " " || e.code === "Space") { e.preventDefault(); onAdvanceTap(); }
@@ -4554,6 +4968,7 @@ async function load() {
   updateAutoZoomUI();
   applyPlayerName();
   applyVoiceModeClass();
+  applyStoredPalette();
   wire();
   updateStats();
   // Kick off voices list (speech synthesis)
