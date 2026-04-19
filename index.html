@@ -2543,7 +2543,9 @@ function pickNext() {
   state.turnJustAdvanced = false;
   state.skipFirstTurnAnnounce = false;
   maybeStartListeningForStage();
-  startTryTimer();
+  const grace = state.initialGrace || 0;
+  state.initialGrace = 0;
+  startTryTimer(TRY_SECONDS, grace);
 }
 
 function updateTriesDots() {
@@ -2823,19 +2825,34 @@ function advancePlayer() {
 const TRY_SECONDS = 10;
 const STEAL_SECONDS = 5;
 const STEAL_BONUS = 5;
-function startTryTimer(seconds) {
+function startTryTimer(seconds, freezeMs) {
   cancelTryTimer();
   const s = seconds || TRY_SECONDS;
-  state.tryTimerEnd = Date.now() + s * 1000;
+  const freeze = freezeMs || 0;
   const el = $("tryTimer");
-  if (el) el.hidden = false;
-  renderTryTimer();
-  state.tryTimerInterval = setInterval(renderTryTimer, 200);
-  state.tryTimerTimeout = setTimeout(onTryTimerExpired, s * 1000);
+  if (el) {
+    el.hidden = false;
+    el.textContent = String(s);
+    el.className = "try-timer";
+  }
+  // Freeze window: show the badge at its full value while a greeting
+  // or announcement plays, THEN begin the real countdown.
+  const begin = () => {
+    state.tryTimerEnd = Date.now() + s * 1000;
+    renderTryTimer();
+    state.tryTimerInterval = setInterval(renderTryTimer, 200);
+    state.tryTimerTimeout = setTimeout(onTryTimerExpired, s * 1000);
+  };
+  if (freeze > 0) {
+    state.tryTimerFreeze = setTimeout(begin, freeze);
+  } else {
+    begin();
+  }
 }
 function cancelTryTimer() {
   if (state.tryTimerInterval) { clearInterval(state.tryTimerInterval); state.tryTimerInterval = null; }
   if (state.tryTimerTimeout) { clearTimeout(state.tryTimerTimeout); state.tryTimerTimeout = null; }
+  if (state.tryTimerFreeze) { clearTimeout(state.tryTimerFreeze); state.tryTimerFreeze = null; }
   state.tryTimerEnd = 0;
   const el = $("tryTimer");
   if (el) { el.textContent = `${TRY_SECONDS}`; el.className = "try-timer"; el.hidden = true; }
@@ -2905,8 +2922,12 @@ function enterSteal() {
   $("submitBtn").disabled = false;
   updateInputPlaceholder();
   setTimeout(() => $("answerInput").focus(), 40);
-  if (state.voiceMode) restartListeningSoon();
-  startTryTimer(STEAL_SECONDS);
+  if (state.voiceMode) {
+    speakBritish(`${cur().name}, you have 5 seconds to steal… go!`);
+    restartListeningSoon();
+  }
+  // 2s freeze so the announcement doesn't eat into the 5s window.
+  startTryTimer(STEAL_SECONDS, 2000);
 }
 function exitSteal() {
   state.stealActive = false;
@@ -3065,6 +3086,14 @@ function pickBritishVoice() {
 function speakBritish(text) {
   if (Audio.muted) return;
   if (!("speechSynthesis" in window)) return;
+  // Conditional cancel: clear any in-flight utterance so a new one
+  // (e.g. steal announcement) doesn't overlap. Only when something is
+  // actually queued — unconditional cancel consumed the gesture token
+  // on Chrome (see SessionLog).
+  try {
+    const s = window.speechSynthesis;
+    if (s.speaking || s.pending) s.cancel();
+  } catch(e) {}
   const utter = new SpeechSynthesisUtterance(text);
   const v = pickBritishVoice();
   if (v) { utter.voice = v; utter.lang = v.lang; } else { utter.lang = "en-GB"; }
@@ -3623,6 +3652,10 @@ function wire() {
     }, 8000);
 
     $("welcome").classList.remove("show");
+    // Give the first question a 5-second grace period so the greeting
+    // can finish and the player can orient to the map before the clock
+    // begins. Cleared by pickNext on first use.
+    state.initialGrace = 5000;
     pickNext();
 
     // Tone.js audio init can happen in the background — it doesn't
