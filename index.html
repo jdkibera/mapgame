@@ -28,16 +28,22 @@
     --text-light: #999999;
     --charcoal: #2D2D2D;
 
-    /* Vintage-atlas palette — very light, sun-bleached parchment.
-       Continents are defined by the dark coastline stroke + a subtle
-       sea-shading halo rather than fill contrast. Ocean/land are
-       nearly the same value so the ink coastline carries the whole
-       separation — same idea as the OldCityPrints reference. */
-    --ocean: #F4E7C5;
-    --ocean-deep: #D9BD8A;
-    --ocean-shore: #E6D2A0;          /* darker ring near coasts — "depth" */
-    --ocean-hi: #FBF0D4;             /* center of the sea gradient */
-    --land: #FAEED0;
+    /* Old-world atlas typography — applied in every palette. Display
+       face is IM Fell English SC (small-caps), the same hand-inked
+       look used on the admiralty-blue variant. */
+    --font-heading: 'Cormorant Garamond', Georgia, serif;
+    --font-body: 'Source Serif 4', Georgia, serif;
+    --font-display: 'IM Fell English SC', 'Cormorant Garamond', Georgia, serif;
+
+    /* Vintage-atlas palette — cream continents on a warm sepia sea.
+       Land is deliberately brighter than the brightest ocean tone so
+       coastlines read by value contrast as well as by the ink stroke,
+       matching the classic cream-on-tan atlas look. */
+    --ocean: #E8D5A0;
+    --ocean-deep: #C9A868;
+    --ocean-shore: #D8BE82;          /* darker ring near coasts — "depth" */
+    --ocean-hi: #F0E2B6;             /* center of the sea gradient */
+    --land: #FDF6DC;
     --land-stroke: #4A3320;
     --graticule: #A88C5A;
     --ink-soft: rgba(74, 51, 32, 0.7);
@@ -63,10 +69,6 @@
     --bad-soft: #E8C5BD;
     --amber: #C79A5A;
     --amber-soft: #EED7B8;
-
-    --font-heading: 'Cormorant Garamond', Georgia, serif;
-    --font-body: 'Source Serif 4', Georgia, serif;
-    --font-display: 'IM Fell English SC', 'Cormorant Garamond', Georgia, serif;
   }
 
   * { box-sizing: border-box; }
@@ -255,7 +257,7 @@
   .deco-rhumb { stroke: var(--land-stroke); stroke-opacity: 0.25; fill: none; stroke-width: 0.3; }
   .deco-cartouche-text {
     font-family: var(--font-display);
-    font-size: 7px;
+    font-size: 10px;
     letter-spacing: 0.28em;
     fill: var(--land-stroke);
     opacity: 0.75;
@@ -345,7 +347,7 @@
   .hud-score .sep { width: 1px; background: var(--line-soft); align-self: stretch; }
 
   .hud-toolbar {
-    top: 106px; right: 18px;
+    top: 18px; right: 340px;
     padding: 8px;
     display: flex; gap: 6px; align-items: center;
   }
@@ -649,12 +651,12 @@
      number alone. */
   .try-timer {
     position: fixed;
-    bottom: 16px;
-    left: 24px;
+    bottom: 90px;
+    left: 64px;
     z-index: 20;
     font-family: var(--font-display);
     font-variant-numeric: tabular-nums;
-    font-size: 8.5rem;
+    font-size: 7rem;
     line-height: 1;
     color: var(--navy);
     text-shadow:
@@ -1519,10 +1521,6 @@
       <option value="Oceans">Oceans</option>
     </select>
   </button>
-  <button class="tbtn" id="paletteBtn" title="Switch ocean palette — parchment ↔ admiralty blue" aria-label="Toggle map palette">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 13h18"/><path d="M12 4a13 13 0 0 1 0 17"/></svg>
-    Palette
-  </button>
   <button class="tbtn danger" id="resetBtn" title="Reset the entire game">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
     Reset
@@ -1569,6 +1567,9 @@
     <span class="hint-text">Tap or <span class="kbd">Space</span> advance · <span class="kbd">Enter</span> submit</span>
   </div>
   <div class="card-tools">
+    <button class="card-tool" id="paletteBtn" title="Switch ocean palette — parchment ↔ admiralty blue" aria-label="Toggle map palette">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 13h18"/><path d="M12 4a13 13 0 0 1 0 17"/></svg>
+    </button>
     <button class="card-tool" id="flagBtn" title="Flag mode — show the country's flag while you guess" aria-label="Flag mode">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
     </button>
@@ -2561,22 +2562,22 @@ function updateAutoZoomUI() {
   btn.title = state.autoZoom ? "Auto-zoom ON — click to turn off" : "Auto-zoom OFF — click to turn on";
 }
 
-// Palette — parchment (default) ↔ admiralty-blue. Driven by a data
+// Palette — admiralty-blue (default) ↔ parchment. Driven by a data
 // attribute on <body> so the CSS variable overrides cascade to every
 // element that references them (ocean, halo, countries, decorations).
 function togglePalette() {
-  const cur = document.body.getAttribute("data-palette") || "parchment";
-  const next = cur === "parchment" ? "blue" : "parchment";
+  const cur = document.body.getAttribute("data-palette") || "blue";
+  const next = cur === "blue" ? "parchment" : "blue";
   document.body.setAttribute("data-palette", next);
   try { localStorage.setItem("we_palette", next); } catch(e) {}
 }
 function applyStoredPalette() {
+  let pal = "blue";
   try {
     const saved = localStorage.getItem("we_palette");
-    if (saved === "blue" || saved === "parchment") {
-      document.body.setAttribute("data-palette", saved);
-    }
+    if (saved === "blue" || saved === "parchment") pal = saved;
   } catch(e) {}
+  document.body.setAttribute("data-palette", pal);
 }
 
 function recordHistory(id, outcome) {
@@ -3438,23 +3439,23 @@ function drawAtlasDecorations(parent) {
     // Opaque background panel (matches ocean) so the frame rule under
     // it doesn't bleed through the text
     cart.append("rect")
-      .attr("x", -96).attr("y", -17).attr("width", 192).attr("height", 34)
+      .attr("x", -130).attr("y", -24).attr("width", 260).attr("height", 48)
       .attr("fill", "var(--ocean-hi)").attr("stroke", "none");
     // Double-ruled panel outline — the signature "plaque on the frame" look
     cart.append("rect").attr("class", "map-frame-outer")
-      .attr("x", -96).attr("y", -17).attr("width", 192).attr("height", 34);
+      .attr("x", -130).attr("y", -24).attr("width", 260).attr("height", 48);
     cart.append("rect").attr("class", "map-frame-inner")
-      .attr("x", -92).attr("y", -13).attr("width", 184).attr("height", 26);
+      .attr("x", -125).attr("y", -19).attr("width", 250).attr("height", 38);
     cart.append("text").attr("class", "deco-cartouche-text")
-      .attr("font-size", 11).attr("y", -2).text("MAP OF · THE WORLD");
+      .attr("font-size", 15).attr("y", -3).text("MAP OF · THE WORLD");
     cart.append("text").attr("class", "deco-cartouche-text")
-      .attr("font-size", 5).attr("y", 9).attr("opacity", 0.62)
+      .attr("font-size", 7).attr("y", 13).attr("opacity", 0.62)
       .text("DRAWN FOR YOUNG VOYAGERS");
     // Flourish finials off each end of the plaque
-    cart.append("path").attr("class", "deco-ink").attr("stroke-width", 0.45).attr("stroke-opacity", 0.65)
-      .attr("d", "M-96,0 L-106,-6 L-100,0 L-106,6  M-96,-17 q-4,0 -6,-3  M-96,17 q-4,0 -6,3");
-    cart.append("path").attr("class", "deco-ink").attr("stroke-width", 0.45).attr("stroke-opacity", 0.65)
-      .attr("d", "M96,0 L106,-6 L100,0 L106,6  M96,-17 q4,0 6,-3  M96,17 q4,0 6,3");
+    cart.append("path").attr("class", "deco-ink").attr("stroke-width", 0.5).attr("stroke-opacity", 0.65)
+      .attr("d", "M-130,0 L-142,-8 L-134,0 L-142,8  M-130,-24 q-5,0 -8,-4  M-130,24 q-5,0 -8,4");
+    cart.append("path").attr("class", "deco-ink").attr("stroke-width", 0.5).attr("stroke-opacity", 0.65)
+      .attr("d", "M130,0 L142,-8 L134,0 L142,8  M130,-24 q5,0 8,-4  M130,24 q5,0 8,4");
   }
 }
 
@@ -3495,7 +3496,43 @@ function rebuildPool() {
   });
   // Shuffle and cap to ROUND_SIZE — keeps each playthrough short and replays fresh.
   const shuffled = shuffle(candidates);
-  state.pool = shuffled.slice(0, Math.min(ROUND_SIZE, shuffled.length));
+  const picks = shuffled.slice(0, Math.min(ROUND_SIZE, shuffled.length));
+
+  // Soft continent spread: if the tier pool misses a continent, pull one
+  // random country from that continent out of any tier and slip it in.
+  // Soft because we don't force a match when the continent has no valid
+  // countries available, and we never grow past ROUND_SIZE.
+  const CONTINENTS = ["Africa", "Asia", "Europe", "Americas", "Oceania"];
+  const represented = new Set(picks.map(id => (COUNTRIES[id] && COUNTRIES[id].region) || null).filter(Boolean));
+  const pickSet = new Set(picks);
+  for (const cont of CONTINENTS) {
+    if (represented.has(cont)) continue;
+    const contCandidates = [];
+    for (const t of TIERS) {
+      for (const id of t.ids) {
+        if (pickSet.has(id)) continue;
+        const meta = COUNTRIES[id];
+        if (!meta || meta.ocean) continue;
+        if (meta.region !== cont) continue;
+        if (!available.has(id)) continue;
+        contCandidates.push(id);
+      }
+    }
+    if (contCandidates.length === 0) continue;
+    const injected = contCandidates[Math.floor(Math.random() * contCandidates.length)];
+    if (picks.length < ROUND_SIZE) {
+      picks.push(injected);
+    } else {
+      // Swap in at a random position so the injection isn't always last.
+      const idx = Math.floor(Math.random() * picks.length);
+      pickSet.delete(picks[idx]);
+      picks[idx] = injected;
+    }
+    pickSet.add(injected);
+    represented.add(cont);
+  }
+  // Final shuffle so injected picks don't cluster at the end.
+  state.pool = shuffle(picks);
 }
 
 function pickNext() {
