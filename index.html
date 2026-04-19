@@ -2525,6 +2525,31 @@ function submitAnswer() {
   if (!meta) return;
   cancelTryTimer();
 
+  // Steal attempt: single try, bonus points on success, reveal on fail.
+  if (state.stealActive) {
+    if (state.stage === STAGE.COUNTRY && matchesCountryAny(meta)) {
+      const p = cur();
+      p.score += STEAL_BONUS;
+      p.levelScore += STEAL_BONUS;
+      p.correct += 1;
+      gMap.selectAll("path.country").filter(d => d.id === state.currentId)
+        .classed("target", false).classed("correct-flash", true);
+      showFeedback("correct", `✓ STEAL! ${meta.name}. +${STEAL_BONUS}`);
+      fireConfetti();
+      playCorrectSfx();
+      updateStats();
+      exitSteal();
+      recordHistory(state.currentId, "partial");
+      resolveCurrent();
+    } else {
+      showFeedback("wrong", "Steal failed.");
+      playWrongSfx();
+      exitSteal();
+      revealCountry(meta);
+    }
+    return;
+  }
+
   if (state.stage === STAGE.COUNTRY) {
     if (matchesCountryAny(meta)) {
       const pts = pointsForTries(state.tries);
@@ -2565,7 +2590,7 @@ function submitAnswer() {
       cur().streak = 0;
       updateStats();
       if (state.tries >= 3) {
-        revealCountry(meta);
+        if (canSteal()) enterSteal(); else revealCountry(meta);
       } else {
         showFeedback("wrong", `Not quite. ${3 - state.tries} tr${3 - state.tries === 1 ? "y" : "ies"} left.`);
         playWrongSfx();
@@ -2749,14 +2774,18 @@ function advancePlayer() {
 
 /* Per-try 10-second countdown. Each try the player has gets its own
    10s window. If it expires without a submission, the try is consumed
-   (same effect as a wrong answer). Cancelled on submit or reveal. */
+   (same effect as a wrong answer). Cancelled on submit or reveal.
+   Steal mode uses a shorter 5s window (see enterSteal). */
 const TRY_SECONDS = 10;
-function startTryTimer() {
+const STEAL_SECONDS = 5;
+const STEAL_BONUS = 5;
+function startTryTimer(seconds) {
   cancelTryTimer();
-  state.tryTimerEnd = Date.now() + TRY_SECONDS * 1000;
-  renderTryTimer();
+  const s = seconds || TRY_SECONDS;
+  state.tryTimerEnd = Date.now() + s * 1000;
+  renderTryTimer(s);
   state.tryTimerInterval = setInterval(renderTryTimer, 250);
-  state.tryTimerTimeout = setTimeout(onTryTimerExpired, TRY_SECONDS * 1000);
+  state.tryTimerTimeout = setTimeout(onTryTimerExpired, s * 1000);
 }
 function cancelTryTimer() {
   if (state.tryTimerInterval) { clearInterval(state.tryTimerInterval); state.tryTimerInterval = null; }
@@ -2777,19 +2806,68 @@ function onTryTimerExpired() {
   if (state.stage !== STAGE.COUNTRY && state.stage !== STAGE.CAPITAL) return;
   const meta = COUNTRIES[state.currentId];
   if (!meta) return;
+  // Steal timeout → reveal (no bonus awarded).
+  if (state.stealActive) {
+    showFeedback("wrong", "Steal — time's up.");
+    playWrongSfx();
+    exitSteal();
+    revealCountry(meta);
+    return;
+  }
   state.tries += 1;
   updateTriesDots();
   cur().streak = 0;
   updateStats();
   if (state.tries >= 3) {
-    if (state.stage === STAGE.COUNTRY) revealCountry(meta);
-    else revealCapital(meta);
+    if (state.stage === STAGE.COUNTRY && canSteal()) {
+      enterSteal();
+    } else if (state.stage === STAGE.COUNTRY) {
+      revealCountry(meta);
+    } else {
+      revealCapital(meta);
+    }
   } else {
     showFeedback("wrong", `Time's up. ${3 - state.tries} tr${3 - state.tries === 1 ? "y" : "ies"} left.`);
     playWrongSfx();
     startTryTimer();
     if (state.voiceMode) restartListeningSoon();
   }
+}
+
+/* Multi-player steal: when the active player exhausts all 3 tries on
+   the country question, the next player gets a single 5-second attempt
+   for a fixed STEAL_BONUS. After the steal resolves (success, wrong, or
+   timeout) control returns to the original player's rotation slot and
+   pickNext advances normally. */
+function canSteal() {
+  return state.mode === "multi"
+      && state.players.length > 1
+      && !state.stealActive;
+}
+function enterSteal() {
+  cancelTryTimer();
+  state.stealActive = true;
+  state.stealFromIdx = state.currentPlayerIdx;
+  state.currentPlayerIdx = (state.currentPlayerIdx + 1) % state.players.length;
+  state.tries = 0;
+  updateTriesDots();
+  updateStats();
+  $("promptEyebrow").textContent = `STEAL — ${cur().name}, 5 seconds!`;
+  $("answerInput").value = "";
+  $("answerInput").disabled = false;
+  $("submitBtn").disabled = false;
+  updateInputPlaceholder();
+  setTimeout(() => $("answerInput").focus(), 40);
+  if (state.voiceMode) restartListeningSoon();
+  startTryTimer(STEAL_SECONDS);
+}
+function exitSteal() {
+  state.stealActive = false;
+  if (state.stealFromIdx != null) {
+    state.currentPlayerIdx = state.stealFromIdx;
+    state.stealFromIdx = null;
+  }
+  updateStats();
 }
 
 /* Auto-advance after a question resolves (for iPad-friendly play) */
@@ -2808,7 +2886,8 @@ function onAdvanceTap() {
   cancelAutoAdvance();
   if (state.stage === STAGE.COUNTRY) {
     const meta = COUNTRIES[state.currentId];
-    if (meta) revealCountry(meta);
+    if (!meta) return;
+    if (canSteal()) enterSteal(); else revealCountry(meta);
     return;
   }
   advance();
