@@ -2797,11 +2797,24 @@ function resolveCurrent() {
 }
 
 function advance() {
-  if (state.stage === STAGE.CAPITAL) {
-    // Skip capital bonus
+  // Stealer giving up on an active steal → restore rotation + reveal.
+  if (state.stealActive) {
+    exitSteal();
     const meta = COUNTRIES[state.currentId];
+    if (!meta) return;
+    if (state.stage === STAGE.COUNTRY) revealCountry(meta);
+    else revealCapital(meta);
+    return;
+  }
+  if (state.stage === STAGE.CAPITAL) {
+    const meta = COUNTRIES[state.currentId];
+    if (!meta) return;
+    // If a multi-mode game has another player waiting, giving up on
+    // the capital bonus hands it to the next player as a steal rather
+    // than just logging a skip.
+    if (canSteal()) { enterSteal(); return; }
     showFeedback("", `Skipped — capital is ${meta.capital}.`);
-      recordHistory(state.currentId, "partial");
+    recordHistory(state.currentId, "partial");
     resolveCurrent();
     return;
   }
@@ -3014,6 +3027,17 @@ function cancelAutoAdvance() {
 /* Single handler used by Space / Tap / click — skips or advances based on stage */
 function onAdvanceTap() {
   cancelAutoAdvance();
+  // If we're in the middle of a steal and the stealer taps Space, the
+  // steal is abandoned — restore rotation first so the subsequent
+  // reveal doesn't leave stealActive stuck.
+  if (state.stealActive) {
+    exitSteal();
+    const meta = COUNTRIES[state.currentId];
+    if (!meta) return;
+    if (state.stage === STAGE.COUNTRY) revealCountry(meta);
+    else revealCapital(meta);
+    return;
+  }
   if (state.stage === STAGE.COUNTRY) {
     const meta = COUNTRIES[state.currentId];
     if (!meta) return;
@@ -3817,16 +3841,13 @@ function wire() {
     if (e.code !== "Space" && e.key !== " ") return;
     const activeIsInput = document.activeElement === $("answerInput");
 
-    // In voice mode the keyboard isn't being used to type, so Space always advances.
-    // COUNTRY stage → reveal + advance (skip). CAPITAL/RESOLVED → advance.
+    // In voice mode the keyboard isn't being used to type, so Space
+    // always advances. Defer to onAdvanceTap / advance so the same
+    // canSteal() checks apply (COUNTRY and CAPITAL stages).
     if (state.voiceMode) {
       e.preventDefault();
-      if (state.stage === STAGE.COUNTRY) {
-        const meta = COUNTRIES[state.currentId];
-        if (meta) revealCountry(meta);
-        return;
-      }
-      advance();
+      if (state.stage === STAGE.COUNTRY) onAdvanceTap();
+      else advance();
       return;
     }
 
