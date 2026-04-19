@@ -722,6 +722,39 @@
   .add-player-btn:hover { border-color: var(--copper); background: var(--copper-pale); }
   .add-player-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
+  /* Game-config row on the welcome card — lets the player pick region
+     + length up front so they don't have to fiddle in-game with the
+     countdown running. */
+  .welcome-settings {
+    display: flex; justify-content: center; gap: 14px;
+    margin: 8px 0 14px 0;
+    flex-wrap: wrap;
+  }
+  .welcome-settings label {
+    display: flex; flex-direction: column; align-items: flex-start;
+    gap: 3px;
+    font-family: var(--font-heading);
+    font-style: italic;
+    font-size: 0.78rem;
+    color: var(--text-med);
+  }
+  .welcome-settings label > span {
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .welcome-settings select {
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    color: var(--navy);
+    padding: 6px 10px;
+    background: var(--cream);
+    border: 1px solid var(--card-border);
+    border-radius: 6px;
+    outline: none;
+    cursor: pointer;
+  }
+  .welcome-settings select:focus { border-color: var(--copper); }
+
   /* Multiplayer score strip (replaces the 4-stat card in multi mode) */
   .hud-players {
     top: 18px; right: 18px;
@@ -1389,6 +1422,31 @@
         <input type="text" class="player-name" placeholder="Player 2" maxlength="20" autocomplete="off" spellcheck="false" />
       </div>
       <button type="button" class="add-player-btn" id="addPlayerBtn">+ Add player</button>
+    </div>
+
+    <div class="welcome-settings">
+      <label>
+        <span>Region</span>
+        <select id="welcomeRegion">
+          <option value="all">All regions</option>
+          <option value="Africa">Africa</option>
+          <option value="Americas">Americas</option>
+          <option value="Asia">Asia</option>
+          <option value="Europe">Europe</option>
+          <option value="Oceania">Oceania</option>
+          <option value="Oceans">Oceans</option>
+        </select>
+      </label>
+      <label>
+        <span>Length</span>
+        <select id="welcomeLength">
+          <option value="25">25 countries</option>
+          <option value="50">50 countries</option>
+          <option value="75">75 countries</option>
+          <option value="100">100 countries</option>
+          <option value="0">All (unlimited)</option>
+        </select>
+      </label>
     </div>
 
     <p style="font-size:0.85rem;">Progress through twelve levels, from <em>Home Waters</em> to <em>Here Be Dragons</em>. Use <span class="kbd">Space</span> to advance, <span class="kbd">Enter</span> to submit, and the <strong>🎤</strong> to switch to voice mode (stays on).</p>
@@ -3625,6 +3683,29 @@ function wire() {
 
   refreshStartButton();
 
+  // Welcome-card region + length selectors mirror the in-game toolbar
+  // selectors. Setting either updates state and the other control so
+  // they stay in sync.
+  const welcomeRegion = $("welcomeRegion");
+  const welcomeLength = $("welcomeLength");
+  if (welcomeRegion) {
+    welcomeRegion.value = state.regionFilter || "all";
+    welcomeRegion.addEventListener("change", (e) => {
+      state.regionFilter = e.target.value;
+      const inGame = $("regionSelect");
+      if (inGame) inGame.value = state.regionFilter;
+    });
+  }
+  if (welcomeLength) {
+    welcomeLength.value = String(state.gameLength);
+    welcomeLength.addEventListener("change", (e) => {
+      state.gameLength = Number(e.target.value) || 0;
+      try { localStorage.setItem("we_gameLength", String(state.gameLength)); } catch(err) {}
+      const inGame = $("lengthSelect");
+      if (inGame) inGame.value = String(state.gameLength);
+    });
+  }
+
   // ----------------------------------------------------------------
   // Start click — fire the greeting synchronously inside the gesture,
   // immediately show the map, kick off audio + game in the background.
@@ -3644,6 +3725,12 @@ function wire() {
     }
     state.currentPlayerIdx = state.players.length - 1; // advancePlayer() rolls to 0
     document.body.classList.toggle("multi-mode", state.mode === "multi");
+    // Rebuild the pool now that the user has locked in region + length
+    // via the welcome selectors. rebuildPool ran once at load time with
+    // stale defaults.
+    state.answered = new Set();
+    state.totalAnswered = 0;
+    rebuildPool();
     applyPlayerName();
     const firstUp = state.players[0].name;
     const greet = state.mode === "multi"
