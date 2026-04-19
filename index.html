@@ -282,27 +282,37 @@
   }
 
   /* HUD — parchment labels pinned to the map. Double-ruled outline in
-     the map's ink colour (land-stroke) with a faint inner rule at
-     ~3px offset, echoing the cartouche plaque. Rounded corners are
-     deliberately minimal so the cards read as cut paper, not chat
-     bubbles. */
+     the map's ink colour (land-stroke), both rules displaced by the
+     hudSketch SVG filter so the edges read as hand-inked (like the
+     cartouche). Text inside the cards is untouched because only the
+     pseudo-element rectangles are filtered. */
   .hud {
     position: fixed;
     background: var(--card-bg);
-    border: 1px solid var(--land-stroke);
     border-radius: 3px;
     box-shadow:
       0 4px 14px rgba(30, 58, 95, 0.14),
       0 1px 2px rgba(0, 0, 0, 0.06);
   }
-  .hud::before {
+  .hud::before,
+  .hud::after {
     content: "";
     position: absolute;
-    inset: 3px;
-    border: 0.5px solid var(--land-stroke);
-    border-radius: 2px;
-    opacity: 0.4;
     pointer-events: none;
+    border-style: solid;
+    border-color: var(--land-stroke);
+    filter: url(#hudSketch);
+  }
+  .hud::before {
+    inset: 0;
+    border-width: 1.1px;
+    border-radius: 3px;
+  }
+  .hud::after {
+    inset: 4px;
+    border-width: 0.5px;
+    border-radius: 2px;
+    opacity: 0.45;
   }
 
   .hud-title {
@@ -361,9 +371,15 @@
   .hud-score .value { font-size: 1.45rem; font-weight: 500; color: var(--navy); font-variant-numeric: tabular-nums; }
   .hud-score .sep { width: 1px; background: var(--line-soft); align-self: stretch; }
 
+  /* Control strip sits just above the prompt card, horizontally
+     centred so it reads as part of the same stacked unit. The bottom
+     offset tracks the prompt's expected height (prompt is ~210px tall
+     once we've tightened the spacing, plus 34px from the viewport
+     bottom and a 10px gap). */
   .hud-toolbar {
-    top: 18px; right: 340px;
-    padding: 8px;
+    top: auto; right: auto;
+    bottom: 258px; left: 50%; transform: translateX(-50%);
+    padding: 6px 8px;
     display: flex; gap: 6px; align-items: center;
   }
   .tbtn {
@@ -506,30 +522,30 @@
   .hud-prompt {
     bottom: 34px; left: 50%; transform: translateX(-50%);
     width: min(660px, calc(100vw - 36px));
-    padding: 20px 26px 18px 26px;
+    padding: 12px 24px 12px 24px;
   }
   .prompt-row {
-    display: flex; flex-direction: column; gap: 4px;
+    display: flex; flex-direction: column; gap: 1px;
     text-align: center;
-    margin-bottom: 14px;
+    margin-bottom: 8px;
   }
   .prompt-eyebrow {
-    font-size: 0.72rem; letter-spacing: 0.26em;
+    font-size: 0.68rem; letter-spacing: 0.26em;
     text-transform: uppercase; color: var(--copper);
     font-style: italic;
   }
   .prompt-question {
     font-family: var(--font-heading);
-    font-size: 1.9rem; font-weight: 500;
+    font-size: 1.55rem; font-weight: 500;
     color: var(--navy);
     letter-spacing: 0.01em;
     line-height: 1.1;
   }
   .prompt-sub {
-    font-size: 0.85rem; color: var(--text-med);
+    font-size: 0.8rem; color: var(--text-med);
     font-style: italic;
-    margin-top: 2px;
-    min-height: 1.2em;
+    margin-top: 1px;
+    min-height: 1em;
   }
 
   .input-row {
@@ -634,10 +650,10 @@
   }
 
   .feedback {
-    margin-top: 10px;
-    min-height: 22px;
-    text-align: center;
-    font-size: 0.95rem;
+    margin-top: 4px;
+    min-height: 18px;
+    text-align: left;
+    font-size: 0.88rem;
     font-style: italic;
     color: var(--text-med);
     transition: color 0.2s;
@@ -647,9 +663,9 @@
   .feedback.reveal { color: var(--navy); font-weight: 600; font-style: normal; }
 
   .tries {
-    margin-top: 10px;
+    margin-top: 6px;
     display: flex; justify-content: flex-start; align-items: center; gap: 10px;
-    font-size: 0.72rem; letter-spacing: 0.18em;
+    font-size: 0.7rem; letter-spacing: 0.18em;
     text-transform: uppercase; color: var(--text-light);
   }
   .tries .dots { display: inline-flex; gap: 5px; }
@@ -1477,6 +1493,17 @@
 </style>
 </head>
 <body>
+
+<!-- Hand-sketch SVG filter for HUD borders — fractal-noise displacement
+     gives the card outlines the same hand-inked wobble as the cartouche
+     plaque and the coastlines. Applied via CSS `filter: url(#hudSketch)`
+     on the ::before / ::after rules of every .hud element. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <filter id="hudSketch" x="-5%" y="-5%" width="110%" height="110%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.07" numOctaves="2" seed="31" result="noise"/>
+    <feDisplacementMap in="SourceGraphic" in2="noise" scale="1.4" xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
+</svg>
 
 <div id="mapWrap">
   <svg id="map"></svg>
