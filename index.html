@@ -2845,16 +2845,11 @@ function speakBritish(text) {
   if (!("speechSynthesis" in window)) return;
   const utter = new SpeechSynthesisUtterance(text);
   const v = pickBritishVoice();
-  // TEMP diagnostic — full lifecycle, remove once playback is verified.
-  console.log("[voice]", v && v.name, "local:", v && v.localService, "/", window.speechSynthesis.getVoices().length, "voices");
   if (v) { utter.voice = v; utter.lang = v.lang; } else { utter.lang = "en-GB"; }
   utter.rate = 0.95;
   utter.pitch = 1.05;
   utter.volume = 0.9;
-  utter.onstart = () => console.log("[voice] onstart");
-  utter.onend   = () => console.log("[voice] onend");
-  utter.onerror = (e) => console.log("[voice] onerror", e.error || e);
-  try { window.speechSynthesis.speak(utter); } catch(e) { console.log("[voice] speak threw", e); }
+  try { window.speechSynthesis.speak(utter); } catch(e) {}
 }
 
 function updateLevelBadge() {
@@ -3390,16 +3385,9 @@ function wire() {
     $("welcome").classList.remove("show");
     pickNext();
 
-    // Tone.js audio init is DEFERRED until the greeting has had time to
-    // play. Chrome silences a queued speechSynthesis utterance when an
-    // AudioContext activates in the same tick — which is what was
-    // happening here (Samantha picked correctly per diagnostic, but no
-    // audio). 4s covers a solo greeting; the 8s mic-suppress window
-    // covers multi-player. Tone.start still works outside a gesture
-    // once the page has had any prior interaction.
-    setTimeout(() => {
-      audioInit().then(() => startAmbient(state.level)).catch(() => {});
-    }, 4000);
+    // Tone.js audio init can happen in the background — it doesn't
+    // affect the greeting playback.
+    audioInit().then(() => startAmbient(state.level)).catch(() => {});
   });
   $("playAgainBtn").addEventListener("click", async () => {
     await audioInit();

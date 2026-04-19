@@ -53,13 +53,23 @@ Each of those was a patch on top of the previous patch. By the end, the flow had
 
 ## Root cause of the "Chrome: music plays, greeting silent" bug
 
-Found and fixed 2026-04-18. The diagnostic showed `speakBritish` called, voice resolved to `Google UK English Female`, then NO `onstart` / `onend` / `onerror` — a queued utterance that silently died. That's the classic failure mode of Chrome's Google-branded voices: they're network-streamed (`localService: false`), and when the Google TTS fetch stalls they drop silently with no event.
+Turned out to be **two separate issues stacked on top of each other**. Takes a restart to shake one of them loose.
 
-`pickBritishVoice` explicitly listed `Google UK English Female` in its preferred-name regex, so Chrome (which exposes the full Google catalogue) always picked it first. On days when Google's endpoint is fine, the greeting plays. On days it isn't, total silence — and nothing else on the page logs anything.
+### Layer 1 — picker preferred a flaky network voice (fixed in code)
 
-**Fix** was pure deletion: drop `Google UK English Female`, `Google US English`, and `Google Australian English Female` from the preferred-name regexes. With those gone the picker falls through to Samantha (local, reliable) on macOS.
+`pickBritishVoice` explicitly listed `Google UK English Female` in its preferred-name regex. Chrome exposes Google's full network-voice catalogue (`localService: false`) and the picker always chose that one first. Network TTS voices silently drop utterances when their fetch stalls — no `onstart`, no `onerror`, just nothing.
 
-Related: never set `utter.lang = "en-GB"` as a fallback when no voice is picked — Chrome will silently pick the Google voice anyway via the lang fallback.
+**Fix** (commit `bd44a55`): pure deletion — drop `Google UK English Female`, `Google US English`, and `Google Australian English Female` from the preferred-name regexes. Picker falls through to Samantha (local) on macOS.
+
+Related: never set `utter.lang = "en-GB"` as a fallback when no voice is picked — Chrome silently picks the Google voice anyway via the lang fallback.
+
+### Layer 2 — Chrome's TTS engine can wedge per-process
+
+Even with the picker returning Samantha correctly, Chrome can sit in a state where `speechSynthesis.speak()` accepts the utterance but fires neither `onstart` nor `onerror` and produces no audio. Web Audio (Tone.js music) keeps working — it's a separate pipeline. No amount of code change fixes this; the engine is stuck inside Chrome.
+
+**Fix**: restart Chrome. On the user's machine, the greeting worked perfectly on first try after a cold restart.
+
+Next time the symptom recurs ("picker returns a local voice, log shows no lifecycle events fire, music still plays"), the fastest path is a Chrome restart before touching any code.
 
 ## How to test the voice flow without a live browser
 
