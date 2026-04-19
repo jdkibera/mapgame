@@ -2922,12 +2922,20 @@ function enterSteal() {
   $("submitBtn").disabled = false;
   updateInputPlaceholder();
   setTimeout(() => $("answerInput").focus(), 40);
+  // Stop the mic while we announce — otherwise SpeechRecognition
+  // captures the TTS output and treats "you have 5 seconds..." as
+  // the steal answer. Re-enable it when the countdown begins.
+  stopListening();
+  state.suppressListening = true;
   if (state.voiceMode) {
     speakBritish(`${cur().name}, you have 5 seconds to steal… go!`);
-    restartListeningSoon();
   }
-  // 2s freeze so the announcement doesn't eat into the 5s window.
-  startTryTimer(STEAL_SECONDS, 2000);
+  const announceMs = 2500;
+  setTimeout(() => {
+    state.suppressListening = false;
+    if (state.voiceMode) startListening();
+  }, announceMs);
+  startTryTimer(STEAL_SECONDS, announceMs);
 }
 function exitSteal() {
   state.stealActive = false;
@@ -3478,13 +3486,22 @@ function wire() {
   }
   $("regionSelect").addEventListener("change", (e) => {
     state.regionFilter = e.target.value;
+    // Fully reset the in-flight question before rebuilding the pool —
+    // otherwise a stale currentId stays highlighted, the try timer
+    // keeps ticking on an orphaned country, and the prompt disagrees
+    // with the map.
+    cancelTryTimer();
+    cancelAutoAdvance();
     state.answered = new Set();
+    state.currentId = null;
+    state.stage = STAGE.IDLE;
+    clearActiveClasses();
+    hidePromptFlag();
     rebuildPool();
     updateStats();
     if (state.pool.length === 0) {
-      // No matching items — show friendly message and stay put
       showFeedback("hint", `No ${state.regionFilter === "all" ? "countries" : state.regionFilter} in this level. Try a different level or region.`);
-      state.stage = STAGE.IDLE;
+      $("promptQuestion").textContent = "Choose another region or level.";
     } else {
       pickNext();
     }
@@ -3641,15 +3658,18 @@ function wire() {
     // carries the speechSynthesis call on Safari/iOS.
     speakBritish(greet);
 
-    // Mic is suppressed while the greeting plays. Multi-player greetings
-    // ("Welcome, Alice, Bob, Charlie! Alice, you're up first.") can run
-    // ~6s, so the window needs to cover them — 5s was cutting Safari's
-    // greeting off mid-sentence when the mic activated.
+    // Mic is suppressed for the same 5s as the countdown grace — that
+    // way voice mode is live the moment the timer starts counting, no
+    // awkward "speak now but mic isn't on yet" gap. Short greetings
+    // (solo / 2 players) finish well inside 5s; a long multi greeting
+    // may trail by a second or two after the mic activates, which is
+    // fine because the mic suppression in the SpeechRecognition layer
+    // still discards self-hearing of TTS.
     state.suppressListening = true;
     setTimeout(() => {
       state.suppressListening = false;
       if (state.voiceMode) startListening();
-    }, 8000);
+    }, 5000);
 
     $("welcome").classList.remove("show");
     // Give the first question a 5-second grace period so the greeting
