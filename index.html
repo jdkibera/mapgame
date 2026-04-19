@@ -28,11 +28,16 @@
     --text-light: #999999;
     --charcoal: #2D2D2D;
 
-    --ocean: #E4EAF0;
-    --ocean-deep: #D3DCE6;
-    --land: #E2DAD0;
-    --land-stroke: #D0C8BE;
-    --graticule: #B8C6D4;
+    /* Vintage-atlas palette: warm tan paper for the sea, slightly
+       lighter cream for the land, dark-chocolate coastlines, and a
+       muted sepia graticule. Continents are defined by the dark
+       coastline stroke + sea-shading halo rather than by a strong
+       fill contrast — matches the hand-drawn aesthetic. */
+    --ocean: #E9D4A5;
+    --ocean-deep: #C9A573;
+    --land: #F0DEB4;
+    --land-stroke: #4A2E16;
+    --graticule: #8C6B3A;
 
     --good: #6E8B6E;
     --good-soft: #C4D4BC;
@@ -56,20 +61,41 @@
     font-weight: 400;
   }
 
-  /* Full-bleed map */
+  /* Full-bleed map — warm sepia paper. A soft lighter center fading
+     to a darker vignette mimics the even glow of an overhead reading
+     lamp on a parchment atlas. */
   #mapWrap {
     position: fixed; inset: 0;
-    background: radial-gradient(ellipse at center, var(--ocean) 0%, var(--ocean-deep) 90%);
+    background:
+      radial-gradient(ellipse at 50% 45%, #F0DEB4 0%, var(--ocean) 48%, var(--ocean-deep) 95%);
+  }
+  /* Paper grain overlay — fractal-noise SVG tile at low opacity, warm
+     sepia tint, multiply-blended so it darkens the paper irregularly
+     and hints at aged texture without dominating. */
+  #mapWrap::after {
+    content: "";
+    position: absolute; inset: 0;
+    pointer-events: none;
+    opacity: 0.26;
+    mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='260' height='260'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='2' stitchTiles='stitch' seed='3'/><feColorMatrix values='0 0 0 0 0.38  0 0 0 0 0.26  0 0 0 0 0.12  0 0 0 0.55 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+    background-size: 260px 260px;
   }
   svg#map { width: 100%; height: 100%; display: block; }
 
+  /* Sea-shading halo: soft brown glow around every coastline, fading
+     outward. This is the classic old-atlas trick that makes continents
+     read clearly even when land and sea share a similar paper tone. */
+  g.countries {
+    filter: drop-shadow(0 0 3.5px rgba(74, 46, 22, 0.55));
+  }
   .country {
     fill: var(--land);
     stroke: var(--land-stroke);
-    stroke-width: 0.5;
+    stroke-width: 0.7;
     transition: fill 0.25s ease, stroke 0.25s ease;
   }
-  .country.hover { fill: #D7CDBF; cursor: help; }
+  .country.hover { fill: #E3CC8F; cursor: help; }
 
   /* Persistent session history fills — override land */
   .country.hist-correct { fill: var(--good-soft); stroke: #96AF90; }
@@ -89,11 +115,12 @@
   .ocean-label {
     font-family: var(--font-body);
     font-style: italic;
-    fill: #8AA0B5;
+    fill: #6E4A22;
     letter-spacing: 0.22em;
     text-transform: uppercase;
     user-select: none;
     pointer-events: none;
+    opacity: 0.78;
     transition: fill 0.25s, font-size 0.25s;
   }
   .ocean-label.hist-correct { fill: #6E8B6E; }
@@ -129,9 +156,9 @@
     100% { transform: scale(3.4); opacity: 0;    stroke-width: 0.5; }
   }
 
-  .graticule { fill: none; stroke: var(--graticule); stroke-width: 0.35; stroke-opacity: 0.6; }
-  .equator { stroke: var(--graticule); stroke-width: 0.5; stroke-dasharray: 3 5; fill: none; }
-  .sphere { fill: none; stroke: var(--land-stroke); stroke-width: 0.6; }
+  .graticule { fill: none; stroke: var(--graticule); stroke-width: 0.4; stroke-opacity: 0.55; }
+  .equator { stroke: var(--graticule); stroke-width: 0.55; stroke-dasharray: 3 5; fill: none; stroke-opacity: 0.7; }
+  .sphere { fill: none; stroke: var(--land-stroke); stroke-width: 0.8; stroke-opacity: 0.65; }
 
   /* HUD — parchment cards */
   .hud {
