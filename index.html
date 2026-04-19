@@ -381,8 +381,8 @@
   .prompt-stack {
     position: fixed;
     bottom: 34px; left: 50%; transform: translateX(-50%);
-    width: min(660px, calc(100vw - 36px));
-    display: flex; flex-direction: column; gap: 18px;
+    width: min(700px, calc(100vw - 36px));
+    display: flex; flex-direction: column; gap: 22px;
     z-index: 10;
   }
   .prompt-stack .hud {
@@ -397,7 +397,6 @@
     padding: 8px 14px;
     display: flex; gap: 6px; align-items: center;
     justify-content: flex-start;
-    overflow: hidden;
   }
   .tbtn {
     background: var(--cream);
@@ -528,6 +527,9 @@
     pointer-events: none;
     z-index: 5;
   }
+  /* Footer is a plain mark — no parchment plaque, no sketched border. */
+  .hud-footer::before,
+  .hud-footer::after { display: none; }
   .tbtn select {
     background: transparent; border: none; color: inherit;
     font-family: inherit; font-size: inherit;
@@ -1518,13 +1520,17 @@
      plaque and the coastlines. Applied via CSS `filter: url(#hudSketch)`
      on the ::before / ::after rules of every .hud element. -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-  <filter id="hudSketch" x="-6%" y="-6%" width="112%" height="112%">
+  <!-- Filter regions are deliberately tight (x:-2%, y:-8%, +4%/+16%)
+       so the displaced border pixels can't bleed more than a couple
+       of px past the card's bounding box — otherwise the outer rules
+       of two stacked cards visually collide in the gap between them. -->
+  <filter id="hudSketch" x="-2%" y="-8%" width="104%" height="116%">
     <feTurbulence type="fractalNoise" baseFrequency="0.045" numOctaves="2" seed="31" result="noise"/>
-    <feDisplacementMap in="SourceGraphic" in2="noise" scale="3.0" xChannelSelector="R" yChannelSelector="G"/>
+    <feDisplacementMap in="SourceGraphic" in2="noise" scale="2.2" xChannelSelector="R" yChannelSelector="G"/>
   </filter>
-  <filter id="hudSketchFine" x="-6%" y="-6%" width="112%" height="112%">
+  <filter id="hudSketchFine" x="-2%" y="-8%" width="104%" height="116%">
     <feTurbulence type="fractalNoise" baseFrequency="0.08" numOctaves="2" seed="47" result="noise"/>
-    <feDisplacementMap in="SourceGraphic" in2="noise" scale="2.0" xChannelSelector="R" yChannelSelector="G"/>
+    <feDisplacementMap in="SourceGraphic" in2="noise" scale="1.4" xChannelSelector="R" yChannelSelector="G"/>
   </filter>
 </svg>
 
@@ -2784,18 +2790,23 @@ function matchesCapitalAny(meta) {
 const SUGGEST = { items: [], index: -1 };
 
 function getSuggestCandidates() {
-  // Current stage's searchable candidates from the active tier (helps with spelling, not global lookup).
+  // Searchable across every country, not just the current tier, so
+  // spell-help actually works when the target is outside the player's
+  // starting tier (typing "ta" should surface Tanzania / Tajikistan /
+  // Taiwan even on Level I). In-tier entries get a flag so we can
+  // rank them above out-of-tier hits when both match the query.
   const tier = TIERS.find(t => t.key === state.level);
-  const ids = tier ? tier.ids : Object.keys(COUNTRIES);
+  const tierIds = new Set(tier ? tier.ids : []);
   const out = [];
-  ids.forEach(id => {
+  Object.keys(COUNTRIES).forEach(id => {
     const meta = COUNTRIES[id];
     if (!meta) return;
+    const inTier = tierIds.has(id);
     if (state.stage === STAGE.COUNTRY) {
-      out.push({ value: meta.name, sub: meta.ocean ? "ocean" : meta.region });
-      (meta.alt || []).forEach(a => out.push({ value: a, sub: meta.name, isAlt: true }));
+      out.push({ value: meta.name, sub: meta.ocean ? "ocean" : meta.region, inTier });
+      (meta.alt || []).forEach(a => out.push({ value: a, sub: meta.name, isAlt: true, inTier }));
     } else if (state.stage === STAGE.CAPITAL && meta.capital) {
-      out.push({ value: meta.capital, sub: meta.name });
+      out.push({ value: meta.capital, sub: meta.name, inTier });
     }
   });
   return out;
@@ -2815,17 +2826,21 @@ function updateSuggestions() {
   const q = normalize(input.value);
   if (q.length < 1) { box.hidden = true; return; }
   const cands = getSuggestCandidates();
-  // Rank: starts-with > contains
-  const starts = [], contains = [];
+  // Rank: starts-with only, in-tier first. Contains-matching was the
+  // culprit behind "United States" / "Britain" / "Italy" showing up
+  // for query "ta" (they contain "ta" as a substring) — useless noise
+  // when the user is trying to spell Tanzania.
+  const inTierStarts = [], outTierStarts = [];
   const seen = new Set();
   cands.forEach(c => {
     const nv = normalize(c.value);
     if (!nv || seen.has(nv)) return;
     seen.add(nv);
-    if (nv.startsWith(q)) starts.push(c);
-    else if (nv.includes(q)) contains.push(c);
+    if (!nv.startsWith(q)) return;
+    if (c.inTier) inTierStarts.push(c);
+    else outTierStarts.push(c);
   });
-  const items = starts.concat(contains).slice(0, 8);
+  const items = inTierStarts.concat(outTierStarts).slice(0, 8);
   if (items.length === 0) { box.hidden = true; return; }
   SUGGEST.items = items;
   SUGGEST.index = 0;
@@ -2919,6 +2934,12 @@ const PORTS = {
   PER: { ll: [115.5, -32.3], name: "Perth" },
   MNL: { ll: [121.1,  14.4], name: "Manila" },
   VAN: { ll: [-123.5, 49.3], name: "Vancouver" },
+  // Added to keep the network port-to-port without mid-ocean waypoint
+  // kinks: Dakar anchors the West-African coast, Colombo bridges the
+  // Indian Ocean, Darwin handles the Australia → SE-Asia link.
+  DKR: { ll: [-17.5,  14.7], name: "Dakar" },
+  COL: { ll: [ 80.0,   6.9], name: "Colombo" },
+  DAR: { ll: [130.8, -12.5], name: "Darwin" },
 };
 
 // Sample a great-circle arc as a LineString so any projection renders
@@ -2986,32 +3007,39 @@ function drawAtlasDecorations(parent) {
   // route gets a weight class (primary / secondary / tertiary) that
   // controls its stroke width and opacity, so the network reads with
   // a natural ink-density variation.
+  // Every route is strictly port-to-port — no mid-ocean literal
+  // waypoints. Some classic steamer paths (around Africa, across
+  // Indonesia) are expressed as multi-segment chains through added
+  // ports (DKR, COL, DAR) rather than a single kinked line. Routes
+  // whose great-circle track would cross a continent are dropped
+  // rather than re-plotted via land-avoiding waypoints.
   const ROUTES = [
     // ---- Transatlantic ----
     { wp: ["NYC", "LON"], w: "primary" },
     { wp: ["NYC", "LIS"], w: "secondary" },
     { wp: ["LON", "LIS"], w: "secondary" },
-    { wp: ["LIS", [-25, 15], "RIO"], w: "secondary" }, // via Cape Verde
-    { wp: ["NYC", [-40, 10], "RIO"], w: "tertiary" },
+    { wp: ["LIS", "RIO"], w: "secondary" },
+    { wp: ["LIS", "DKR"], w: "secondary" },
+    { wp: ["DKR", "RIO"], w: "tertiary" },
     { wp: ["RIO", "BUE"], w: "secondary" },
 
-    // ---- Europe → Africa / India (around the Cape) ----
-    { wp: ["LON", [-10, 36], [-17, 14], [0, -5], [10, -20], "CPT"], w: "primary" },
-    { wp: ["LIS", [-15, 20], [-5, 0], [10, -25], "CPT"], w: "tertiary" },
+    // ---- Europe → Africa (chain down the west coast via Dakar) ----
+    { wp: ["DKR", "CPT"], w: "primary" },
 
     // ---- Mediterranean + Suez lane ----
-    { wp: ["LON", [-6, 36], [10, 37], [28, 34], "SUE"], w: "primary" },
+    { wp: ["LIS", "SUE"], w: "primary" },
     { wp: ["SUE", "ADE"], w: "primary" },
     { wp: ["ADE", "BOM"], w: "secondary" },
-    { wp: ["ADE", [60, 8], [80, 5], "SIN"], w: "tertiary" },
+    { wp: ["ADE", "COL"], w: "tertiary" },
 
     // ---- Indian Ocean ----
     { wp: ["CPT", "BOM"], w: "secondary" },
-    { wp: ["CPT", [75, -35], "PER"], w: "secondary" },
+    { wp: ["CPT", "PER"], w: "secondary" },
     { wp: ["CPT", "BUE"], w: "tertiary" },
     { wp: ["CPT", "RIO"], w: "secondary" },
-    { wp: ["BOM", [80, 5], "SIN"], w: "primary" }, // south of Sri Lanka
-    { wp: ["BOM", [75, 0], [100, -5], "PER"], w: "tertiary" },
+    { wp: ["BOM", "COL"], w: "primary" },
+    { wp: ["COL", "SIN"], w: "primary" },
+    { wp: ["COL", "PER"], w: "tertiary" },
 
     // ---- SE Asia / Far East ----
     { wp: ["SIN", "HKG"], w: "primary" },
@@ -3024,9 +3052,9 @@ function drawAtlasDecorations(parent) {
     { wp: ["YOK", "HON"], w: "secondary" },
     { wp: ["YOK", "SFO"], w: "primary" },
     { wp: ["HON", "SFO"], w: "primary" },
-    { wp: ["HON", [175, -10], "SYD"], w: "secondary" },
-    { wp: ["HON", [175, -10], "AKL"], w: "tertiary" },
-    { wp: ["VAL", [-170, -40], "AKL"], w: "tertiary" },
+    { wp: ["HON", "SYD"], w: "secondary" },
+    { wp: ["HON", "AKL"], w: "tertiary" },
+    { wp: ["VAL", "AKL"], w: "tertiary" },
     { wp: ["SFO", "VAN"], w: "secondary" },
     { wp: ["VAN", "YOK"], w: "secondary" },
 
@@ -3037,12 +3065,11 @@ function drawAtlasDecorations(parent) {
 
     // ---- Australia / Oceania ----
     { wp: ["SYD", "AKL"], w: "secondary" },
-    { wp: ["SYD", [146, -43], [130, -39], "PER"], w: "secondary" }, // S of Tasmania
-    { wp: ["SYD", [156, -28], [150, -20], [144, -10], [128, -5], [114, 0], "SIN"], w: "secondary" }, // Coral Sea → Torres → Java
-    { wp: ["PER", [100, -20], "SIN"], w: "tertiary" },
+    { wp: ["SYD", "DAR"], w: "secondary" },
+    { wp: ["DAR", "SIN"], w: "secondary" },
 
     // ---- Great Southern Ocean ----
-    { wp: ["CPT", [80, -40], "SYD"], w: "tertiary" },
+    { wp: ["CPT", "SYD"], w: "tertiary" },
   ];
 
   ROUTES.forEach(r => {
@@ -4304,39 +4331,45 @@ if ("speechSynthesis" in window) {
 function pickBritishVoice() {
   const voices = getVoices();
   if (!voices.length) return null;
-  // British female voices, in explicit preference order. Serena (macOS,
-  // richer tone) and Martha (macOS newer neural voice) now sit above
-  // Kate so a Mac gets a different accent by default; Microsoft voices
-  // picked up on Windows.
+  // British female voices, in explicit preference order. Kate (macOS
+  // enhanced British) is the reliable warm default; Serena was tried
+  // but sounded robotic on this hardware. "Premium" / "Enhanced"
+  // variants take priority because macOS installs both a compact
+  // (tinny) and an enhanced voice under the same name.
   const gbPrefs = [
-    /Serena/i,
-    /Martha/i,
-    /Microsoft Sonia/i,
-    /Microsoft Libby/i,
-    /Microsoft Hazel/i,
-    /Kate/i,
-    /Moira/i,
-    /Fiona/i,
-    /Stephanie/i,
-    /Amelia/i,
+    /Kate.*Premium/i, /Kate.*Enhanced/i, /Kate/i,
+    /Martha.*Premium/i, /Martha.*Enhanced/i, /Martha/i,
+    /Microsoft Sonia/i, /Microsoft Libby/i, /Microsoft Hazel/i,
+    /Stephanie/i, /Amelia/i,
   ];
+  // Irish / Scottish female voices fall here — acceptable British-isles
+  // accent if none of the English-English options are installed.
+  const isleFemalePrefs = [/Moira/i, /Fiona/i];
   // Fallback: known-female English voices (non-British) — Samantha on
   // macOS/iOS, Zira/Jenny on Windows, etc. Better female-American than
   // a random default male.
   const anyFemaleEn = /(Samantha|Zira|Jenny|Aria|Nora|Ava|Allison|Susan|Tessa|Veena|Karen)/i;
+  // Rule out network Google voices outright (they silently drop utters,
+  // see SessionLog) and any voice explicitly tagged "Compact".
+  const isOK = v => !/Google/i.test(v.name) && !/Compact/i.test(v.name);
+  const okVoices = voices.filter(isOK);
   for (const pref of gbPrefs) {
-    const v = voices.find(vv => /en.?GB/i.test(vv.lang) && pref.test(vv.name));
+    const v = okVoices.find(vv => /en.?GB/i.test(vv.lang) && pref.test(vv.name));
     if (v) return v;
   }
-  // No GB-tagged match — try the same preferences against any en-* voice.
-  for (const pref of gbPrefs) {
-    const v = voices.find(vv => /^en/i.test(vv.lang) && pref.test(vv.name));
+  for (const pref of isleFemalePrefs) {
+    const v = okVoices.find(vv => /^en/i.test(vv.lang) && pref.test(vv.name));
     if (v) return v;
   }
-  const femaleEn = voices.find(v => /^en/i.test(v.lang) && anyFemaleEn.test(v.name));
-  const anyGB = voices.find(v => /en.?GB/i.test(v.lang));
-  const anyEn = voices.find(v => /^en/i.test(v.lang));
-  return femaleEn || anyGB || anyEn || voices[0] || null;
+  // No British/Isle match — try the same preferences against any en-* voice.
+  for (const pref of gbPrefs) {
+    const v = okVoices.find(vv => /^en/i.test(vv.lang) && pref.test(vv.name));
+    if (v) return v;
+  }
+  const femaleEn = okVoices.find(v => /^en/i.test(v.lang) && anyFemaleEn.test(v.name));
+  const anyGB = okVoices.find(v => /en.?GB/i.test(v.lang));
+  const anyEn = okVoices.find(v => /^en/i.test(v.lang));
+  return femaleEn || anyGB || anyEn || okVoices[0] || voices[0] || null;
 }
 
 function speakBritish(text) {
