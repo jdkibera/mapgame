@@ -4331,28 +4331,35 @@ if ("speechSynthesis" in window) {
 function pickBritishVoice() {
   const voices = getVoices();
   if (!voices.length) return null;
-  // British female voices, in explicit preference order. Kate (macOS
-  // enhanced British) is the reliable warm default; Serena was tried
-  // but sounded robotic on this hardware. "Premium" / "Enhanced"
-  // variants take priority because macOS installs both a compact
-  // (tinny) and an enhanced voice under the same name.
+  // Explicit blacklist. Google network voices silently drop utterances
+  // (see SessionLog). The "Compact" suffix is the tinny macOS variant.
+  // The named male / gag Siri voices and older-lady voices get vetoed
+  // outright so the picker can't fall through to them — on a typical
+  // modern Mac this leaves Flo / Sandy / Shelley for en-GB.
+  const blacklist = /(Google|Compact|Daniel|Grandma|Grandpa|Eddy|Reed|Rocko)/i;
+  const okVoices = voices.filter(v => !blacklist.test(v.name));
+  // British female voices, in explicit preference order. Modern macOS
+  // Siri voices (Sandy, Flo) are the warm neural default; older legacy
+  // TTS names (Kate/Martha/Serena) are kept as fallbacks for Macs
+  // where the user has installed them. Microsoft variants cover
+  // Windows.
   const gbPrefs = [
+    /Sandy.*Premium/i, /Sandy.*Enhanced/i, /^Sandy$/i, /Sandy\s*\(/i,
+    /Flo.*Premium/i, /Flo.*Enhanced/i, /^Flo$/i, /Flo\s*\(/i,
+    /Shelley.*Premium/i, /Shelley.*Enhanced/i, /^Shelley$/i, /Shelley\s*\(/i,
     /Kate.*Premium/i, /Kate.*Enhanced/i, /Kate/i,
     /Martha.*Premium/i, /Martha.*Enhanced/i, /Martha/i,
+    /Serena.*Premium/i, /Serena.*Enhanced/i, /Serena/i,
     /Microsoft Sonia/i, /Microsoft Libby/i, /Microsoft Hazel/i,
     /Stephanie/i, /Amelia/i,
   ];
-  // Irish / Scottish female voices fall here — acceptable British-isles
-  // accent if none of the English-English options are installed.
+  // Irish / Scottish female voices — acceptable British-isles accent
+  // if no English-English options are installed.
   const isleFemalePrefs = [/Moira/i, /Fiona/i];
-  // Fallback: known-female English voices (non-British) — Samantha on
-  // macOS/iOS, Zira/Jenny on Windows, etc. Better female-American than
-  // a random default male.
+  // Last-resort female English voices (non-British) — Samantha on
+  // macOS/iOS, Zira/Jenny on Windows, etc. Better female-American
+  // than defaulting to a random male voice.
   const anyFemaleEn = /(Samantha|Zira|Jenny|Aria|Nora|Ava|Allison|Susan|Tessa|Veena|Karen)/i;
-  // Rule out network Google voices outright (they silently drop utters,
-  // see SessionLog) and any voice explicitly tagged "Compact".
-  const isOK = v => !/Google/i.test(v.name) && !/Compact/i.test(v.name);
-  const okVoices = voices.filter(isOK);
   for (const pref of gbPrefs) {
     const v = okVoices.find(vv => /en.?GB/i.test(vv.lang) && pref.test(vv.name));
     if (v) return v;
@@ -4361,7 +4368,6 @@ function pickBritishVoice() {
     const v = okVoices.find(vv => /^en/i.test(vv.lang) && pref.test(vv.name));
     if (v) return v;
   }
-  // No British/Isle match — try the same preferences against any en-* voice.
   for (const pref of gbPrefs) {
     const v = okVoices.find(vv => /^en/i.test(vv.lang) && pref.test(vv.name));
     if (v) return v;
