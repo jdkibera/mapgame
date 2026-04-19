@@ -354,7 +354,7 @@
   .hud-sketch .inner { stroke-width: 1.0; stroke-opacity: 0.42; }
 
   .hud-title {
-    top: 18px; left: 18px;
+    top: 32px; left: 32px;
     padding: 14px 20px 12px 20px;
     max-width: 320px;
   }
@@ -394,7 +394,7 @@
   }
 
   .hud-score {
-    top: 18px; right: 18px;
+    top: 32px; right: 32px;
     padding: 10px 16px;
     display: flex; gap: 18px; align-items: baseline;
     font-family: var(--font-heading);
@@ -2981,6 +2981,14 @@ const PORTS = {
   LAX: { ll: [-118.5, 33.5], name: "Los Angeles" },
   MIA: { ll: [ -80.1, 25.6], name: "Miami" },
   MBS: { ll: [  39.8, -4.0], name: "Mombasa" },
+  // North Atlantic + North Sea hubs so NY / Miami can reach all the
+  // classic trans-Atlantic destinations port-to-port.
+  REY: { ll: [ -22.0, 64.2], name: "Reykjavík" },
+  DUB: { ll: [  -6.4, 53.4], name: "Dublin" },
+  HAM: { ll: [   8.5, 54.1], name: "Hamburg" },
+  AMS: { ll: [   3.5, 52.5], name: "Amsterdam" },
+  // West African hub — Lagos anchors the Gulf of Guinea.
+  LAG: { ll: [   3.2,  6.2], name: "Lagos" },
 };
 
 // Sample a great-circle arc as a LineString so any projection renders
@@ -3065,6 +3073,29 @@ function drawAtlasDecorations(parent) {
     { wp: ["DKR", "RIO"], w: "tertiary" },
     { wp: ["RIO", "BUE"], w: "secondary" },
     { wp: ["NYC", "CPT"], w: "tertiary" },
+
+    // ---- North Atlantic (NY / Miami → British Isles, Low Countries) ----
+    // Some of these (NYC-HAM, LON-HAM) will auto-drop if their GC
+    // clips the British Isles or Jutland; the rest should render.
+    { wp: ["NYC", "REY"], w: "tertiary" },
+    { wp: ["NYC", "DUB"], w: "secondary" },
+    { wp: ["NYC", "HAM"], w: "tertiary" },
+    { wp: ["NYC", "AMS"], w: "tertiary" },
+    { wp: ["MIA", "LON"], w: "secondary" },
+    { wp: ["MIA", "DUB"], w: "tertiary" },
+    { wp: ["REY", "LON"], w: "tertiary" },
+    { wp: ["DUB", "LON"], w: "secondary" },
+    { wp: ["LON", "AMS"], w: "secondary" },
+    { wp: ["LON", "HAM"], w: "tertiary" },
+    { wp: ["AMS", "HAM"], w: "tertiary" },
+
+    // ---- West Africa hub (Lagos) — Europe, Americas, intra-Africa ----
+    { wp: ["LIS", "LAG"], w: "secondary" },
+    { wp: ["NYC", "LAG"], w: "tertiary" },
+    { wp: ["MIA", "LAG"], w: "tertiary" },
+    { wp: ["RIO", "LAG"], w: "secondary" },
+    { wp: ["DKR", "LAG"], w: "secondary" },
+    { wp: ["LAG", "CPT"], w: "secondary" },
 
     // ---- Europe → Africa (chain down the west coast via Dakar) ----
     { wp: ["DKR", "CPT"], w: "primary" },
@@ -3183,7 +3214,8 @@ function drawAtlasDecorations(parent) {
   // Only label the hubs; labels on every port would be a mess.
   const LABEL_PORTS = ["NYC", "LON", "LIS", "RIO", "CPT", "BOM", "SIN",
                        "HKG", "YOK", "SYD", "SFO", "HON", "PAN", "SUE",
-                       "LAX", "MIA", "MBS"];
+                       "LAX", "MIA", "MBS",
+                       "REY", "DUB", "HAM", "AMS", "LAG"];
   const labelOffsets = {  // hand-tuned so labels sit off the coast
     NYC: [-3, -2, "end"],   LON: [ 3, -2, "start"],
     LIS: [-3,  3, "end"],   RIO: [ 3,  3, "start"],
@@ -3194,6 +3226,9 @@ function drawAtlasDecorations(parent) {
     PAN: [-3,  4, "end"],   SUE: [ 3, -2, "start"],
     LAX: [-3,  4, "end"],   MIA: [ 3,  3, "start"],
     MBS: [ 3,  3, "start"],
+    REY: [-3, -2, "end"],   DUB: [-3, -2, "end"],
+    HAM: [ 3, -2, "start"], AMS: [-3,  3, "end"],
+    LAG: [ 3,  3, "start"],
   };
   Object.entries(PORTS).forEach(([key, p]) => {
     const pt = projection(p.ll);
@@ -3616,25 +3651,26 @@ function drawAtlasDecorations(parent) {
     const cart = g.append("g").attr("class", "deco-cartouche")
       .attr("transform", `translate(${cx}, ${cy})`);
     // Opaque background panel (matches ocean) so the frame rule under
-    // it doesn't bleed through the text
+    // it doesn't bleed through the text. Plaque is 50% bigger than
+    // before (260x48 → 390x72) to give the title more presence.
     cart.append("rect")
-      .attr("x", -130).attr("y", -24).attr("width", 260).attr("height", 48)
+      .attr("x", -195).attr("y", -36).attr("width", 390).attr("height", 72)
       .attr("fill", "var(--ocean-hi)").attr("stroke", "none");
     // Double-ruled panel outline — the signature "plaque on the frame" look
     cart.append("rect").attr("class", "map-frame-outer")
-      .attr("x", -130).attr("y", -24).attr("width", 260).attr("height", 48);
+      .attr("x", -195).attr("y", -36).attr("width", 390).attr("height", 72);
     cart.append("rect").attr("class", "map-frame-inner")
-      .attr("x", -125).attr("y", -19).attr("width", 250).attr("height", 38);
+      .attr("x", -187.5).attr("y", -28.5).attr("width", 375).attr("height", 57);
     cart.append("text").attr("class", "deco-cartouche-text")
-      .attr("font-size", 15).attr("y", -3).text("MAP OF · THE WORLD");
+      .attr("font-size", 22.5).attr("y", -4.5).text("MAP OF · THE WORLD");
     cart.append("text").attr("class", "deco-cartouche-text")
-      .attr("font-size", 7).attr("y", 13).attr("opacity", 0.62)
+      .attr("font-size", 10.5).attr("y", 19.5).attr("opacity", 0.62)
       .text("DRAWN FOR YOUNG VOYAGERS");
-    // Flourish finials off each end of the plaque
+    // Flourish finials off each end of the plaque (scaled 1.5x)
     cart.append("path").attr("class", "deco-ink").attr("stroke-width", 0.5).attr("stroke-opacity", 0.65)
-      .attr("d", "M-130,0 L-142,-8 L-134,0 L-142,8  M-130,-24 q-5,0 -8,-4  M-130,24 q-5,0 -8,4");
+      .attr("d", "M-195,0 L-213,-12 L-201,0 L-213,12  M-195,-36 q-7.5,0 -12,-6  M-195,36 q-7.5,0 -12,6");
     cart.append("path").attr("class", "deco-ink").attr("stroke-width", 0.5).attr("stroke-opacity", 0.65)
-      .attr("d", "M130,0 L142,-8 L134,0 L142,8  M130,-24 q5,0 8,-4  M130,24 q5,0 8,4");
+      .attr("d", "M195,0 L213,-12 L201,0 L213,12  M195,-36 q7.5,0 12,-6  M195,36 q7.5,0 12,6");
   }
 }
 
