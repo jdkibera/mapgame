@@ -35,6 +35,19 @@
     --font-body: 'Source Serif 4', Georgia, serif;
     --font-display: 'IM Fell English SC', 'Cormorant Garamond', Georgia, serif;
 
+    /* Country-state fill tones — deliberately washed-out pastels so
+       the map stays calm even after many rounds. Palette-neutral: the
+       same pastels read fine against cream / pale blue / pale jade
+       land tones. */
+    --state-target:     #E4B29A;   /* soft terracotta — active target */
+    --state-target-2:   #C98E73;
+    --state-correct:    #C8DAB8;   /* sage */
+    --state-correct-2:  #9FB68C;
+    --state-wrong:      #E6C0B2;   /* dusty rose */
+    --state-wrong-2:    #C48F7E;
+    --state-revealed:   #C4CAD6;   /* slate lavender */
+    --state-revealed-2: #95A0B3;
+
     /* Vintage-atlas palette — cream continents on a warm sepia sea.
        Land is deliberately brighter than the brightest ocean tone so
        coastlines read by value contrast as well as by the ink stroke,
@@ -62,6 +75,28 @@
     --graticule: #5F7B82;
     --ink-soft: rgba(44, 58, 69, 0.7);
     --paper-edge: #6E8A90;
+
+    --good: #6E8B6E;
+    --good-soft: #C4D4BC;
+    --bad: #B85F4F;
+    --bad-soft: #E8C5BD;
+    --amber: #C79A5A;
+    --amber-soft: #EED7B8;
+  }
+
+  /* Jade variant — turquoise/sea-green sea with forest-green ink, same
+     cream land as the blue palette. Cycles into rotation as a third
+     option alongside parchment and blue. */
+  body[data-palette="jade"] {
+    --ocean: #CADED0;
+    --ocean-deep: #74A088;
+    --ocean-shore: #9EBCA8;
+    --ocean-hi: #DCEBDF;
+    --land: #F5EAC8;
+    --land-stroke: #2D4738;
+    --graticule: #5A7B66;
+    --ink-soft: rgba(45, 71, 56, 0.7);
+    --paper-edge: #6C8E78;
 
     --good: #6E8B6E;
     --good-soft: #C4D4BC;
@@ -136,6 +171,13 @@
       drop-shadow(0 0 10px  rgba(92, 128, 138, 0.22))
       drop-shadow(0 0 22px  rgba(110, 152, 164, 0.10));
   }
+  body[data-palette="jade"] g.countries-wrap {
+    filter:
+      drop-shadow(0 0 1.2px rgba(45, 71, 56, 0.40))
+      drop-shadow(0 0 3.5px rgba(72, 112, 88, 0.28))
+      drop-shadow(0 0 10px  rgba(96, 140, 114, 0.22))
+      drop-shadow(0 0 22px  rgba(118, 168, 140, 0.10));
+  }
   .country {
     fill: var(--land);
     stroke: var(--land-stroke);
@@ -144,20 +186,21 @@
   }
   .country.hover { fill: #F5E0B0; cursor: help; }
 
-  /* Persistent session history fills — override land */
-  .country.hist-correct { fill: var(--good-soft); stroke: #96AF90; }
-  .country.hist-partial { fill: var(--amber-soft); stroke: var(--amber); }
-  .country.hist-revealed { fill: var(--bad-soft); stroke: #B88276; }
+  /* Persistent session history fills — the lighter, softer cousin of
+     the flash colours above. */
+  .country.hist-correct  { fill: var(--state-correct);  stroke: var(--state-correct-2); }
+  .country.hist-partial  { fill: var(--amber-soft);     stroke: var(--amber); }
+  .country.hist-revealed { fill: var(--state-revealed); stroke: var(--state-revealed-2); }
 
   /* Active target highlight — always wins */
   .country.target {
-    fill: var(--copper);
-    stroke: var(--copper-dark);
+    fill: var(--state-target);
+    stroke: var(--state-target-2);
     stroke-width: 1.2;
   }
-  .country.correct-flash { fill: var(--good); stroke: #4A6348; }
-  .country.wrong-flash { fill: var(--bad); stroke: #8C3F32; }
-  .country.revealed { fill: var(--navy); stroke: #0E2440; }
+  .country.correct-flash { fill: var(--state-correct);  stroke: var(--state-correct-2); }
+  .country.wrong-flash   { fill: var(--state-wrong);    stroke: var(--state-wrong-2); }
+  .country.revealed      { fill: var(--state-revealed); stroke: var(--state-revealed-2); }
 
   .ocean-label {
     font-family: var(--font-body);
@@ -1660,7 +1703,7 @@
   </div>
   <div class="feedback" id="feedback"></div>
   <div class="card-tools">
-    <button class="card-tool" id="paletteBtn" title="Switch ocean palette — parchment ↔ admiralty blue" aria-label="Toggle map palette">
+    <button class="card-tool" id="paletteBtn" title="Switch ocean palette — admiralty blue → jade → parchment" aria-label="Toggle map palette">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 13h18"/><path d="M12 4a13 13 0 0 1 0 17"/></svg>
     </button>
     <button class="card-tool" id="flagBtn" title="Flag mode — show the country's flag while you guess" aria-label="Flag mode">
@@ -2658,12 +2701,14 @@ function updateAutoZoomUI() {
   btn.title = state.autoZoom ? "Auto-zoom ON — click to turn off" : "Auto-zoom OFF — click to turn on";
 }
 
-// Palette — admiralty-blue (default) ↔ parchment. Driven by a data
-// attribute on <body> so the CSS variable overrides cascade to every
-// element that references them (ocean, halo, countries, decorations).
+// Palette cycles admiralty-blue → jade → parchment → blue… Driven by
+// a data attribute on <body> so every CSS variable override cascades
+// through the atlas (ocean, halo, countries, decorations).
+const PALETTE_CYCLE = ["blue", "jade", "parchment"];
 function togglePalette() {
   const cur = document.body.getAttribute("data-palette") || "blue";
-  const next = cur === "blue" ? "parchment" : "blue";
+  const idx = PALETTE_CYCLE.indexOf(cur);
+  const next = PALETTE_CYCLE[(idx + 1) % PALETTE_CYCLE.length];
   document.body.setAttribute("data-palette", next);
   try { localStorage.setItem("we_palette", next); } catch(e) {}
 }
@@ -2671,7 +2716,7 @@ function applyStoredPalette() {
   let pal = "blue";
   try {
     const saved = localStorage.getItem("we_palette");
-    if (saved === "blue" || saved === "parchment") pal = saved;
+    if (PALETTE_CYCLE.includes(saved)) pal = saved;
   } catch(e) {}
   document.body.setAttribute("data-palette", pal);
 }
@@ -4336,15 +4381,17 @@ function pickBritishVoice() {
   // The named male / gag Siri voices and older-lady voices get vetoed
   // outright so the picker can't fall through to them — on a typical
   // modern Mac this leaves Flo / Sandy / Shelley for en-GB.
-  const blacklist = /(Google|Compact|Daniel|Grandma|Grandpa|Eddy|Reed|Rocko)/i;
+  // Sandy joins the blacklist — user described her as "underwater
+  // dying". Grandma is a gag elderly-lady voice. Daniel/Grandpa/Eddy/
+  // Reed/Rocko are male or ambiguous. Google network voices silently
+  // drop utterances (SessionLog). Compact = tinny legacy fallback.
+  const blacklist = /(Google|Compact|Daniel|Grandma|Grandpa|Eddy|Reed|Rocko|Sandy)/i;
   const okVoices = voices.filter(v => !blacklist.test(v.name));
-  // British female voices, in explicit preference order. Modern macOS
-  // Siri voices (Sandy, Flo) are the warm neural default; older legacy
-  // TTS names (Kate/Martha/Serena) are kept as fallbacks for Macs
-  // where the user has installed them. Microsoft variants cover
-  // Windows.
+  // British female voices, in explicit preference order. On the user's
+  // Sequoia Mac the only acceptable en-GB Siri voices left after the
+  // blacklist are Flo and Shelley. Kate/Martha/Serena/Microsoft
+  // variants sit below as fallbacks for machines that do have them.
   const gbPrefs = [
-    /Sandy.*Premium/i, /Sandy.*Enhanced/i, /^Sandy$/i, /Sandy\s*\(/i,
     /Flo.*Premium/i, /Flo.*Enhanced/i, /^Flo$/i, /Flo\s*\(/i,
     /Shelley.*Premium/i, /Shelley.*Enhanced/i, /^Shelley$/i, /Shelley\s*\(/i,
     /Kate.*Premium/i, /Kate.*Enhanced/i, /Kate/i,
