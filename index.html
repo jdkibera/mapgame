@@ -2976,6 +2976,11 @@ const PORTS = {
   DKR: { ll: [-17.5,  14.7], name: "Dakar" },
   COL: { ll: [ 80.0,   6.9], name: "Colombo" },
   DAR: { ll: [130.8, -12.5], name: "Darwin" },
+  // Extra hubs so the network has more texture without needing
+  // land-crossing great circles.
+  LAX: { ll: [-118.5, 33.5], name: "Los Angeles" },
+  MIA: { ll: [ -80.1, 25.6], name: "Miami" },
+  MBS: { ll: [  39.8, -4.0], name: "Mombasa" },
 };
 
 // Sample a great-circle arc as a LineString so any projection renders
@@ -3004,7 +3009,9 @@ function waypointRoute(waypoints) {
     const a = resolveWaypoint(waypoints[i]);
     const b = resolveWaypoint(waypoints[i + 1]);
     if (!a || !b) return null;
-    const seg = greatCircleLine(a, b, 40);
+    // 80 samples per segment → tight enough land detection to catch
+    // thin grazes (Iceland, Cuba, Corsica) as well as full crossings.
+    const seg = greatCircleLine(a, b, 80);
     // Avoid duplicating the join point between segments
     if (i > 0) seg.shift();
     coords.push(...seg);
@@ -3053,17 +3060,16 @@ function drawAtlasDecorations(parent) {
     // ---- Transatlantic ----
     { wp: ["NYC", "LON"], w: "primary" },
     { wp: ["NYC", "LIS"], w: "secondary" },
-    { wp: ["LON", "LIS"], w: "secondary" },
     { wp: ["LIS", "RIO"], w: "secondary" },
     { wp: ["LIS", "DKR"], w: "secondary" },
     { wp: ["DKR", "RIO"], w: "tertiary" },
     { wp: ["RIO", "BUE"], w: "secondary" },
+    { wp: ["NYC", "CPT"], w: "tertiary" },
 
     // ---- Europe → Africa (chain down the west coast via Dakar) ----
     { wp: ["DKR", "CPT"], w: "primary" },
 
-    // ---- Mediterranean + Suez lane ----
-    { wp: ["LIS", "SUE"], w: "primary" },
+    // ---- Mediterranean + Suez lane (no LIS-SUE; GC crosses Iberia) ----
     { wp: ["SUE", "ADE"], w: "primary" },
     { wp: ["ADE", "BOM"], w: "secondary" },
     { wp: ["ADE", "COL"], w: "tertiary" },
@@ -3074,8 +3080,15 @@ function drawAtlasDecorations(parent) {
     { wp: ["CPT", "BUE"], w: "tertiary" },
     { wp: ["CPT", "RIO"], w: "secondary" },
     { wp: ["BOM", "COL"], w: "primary" },
+    { wp: ["BOM", "SIN"], w: "secondary" },
     { wp: ["COL", "SIN"], w: "primary" },
     { wp: ["COL", "PER"], w: "tertiary" },
+
+    // ---- East Africa (Mombasa hub for the Nairobi region) ----
+    { wp: ["MBS", "ADE"], w: "tertiary" },
+    { wp: ["MBS", "BOM"], w: "secondary" },
+    { wp: ["MBS", "COL"], w: "tertiary" },
+    { wp: ["MBS", "CPT"], w: "secondary" },
 
     // ---- SE Asia / Far East ----
     { wp: ["SIN", "HKG"], w: "primary" },
@@ -3083,6 +3096,7 @@ function drawAtlasDecorations(parent) {
     { wp: ["HKG", "MNL"], w: "secondary" },
     { wp: ["HKG", "YOK"], w: "primary" },
     { wp: ["MNL", "YOK"], w: "tertiary" },
+    { wp: ["HON", "MNL"], w: "tertiary" },
 
     // ---- Pacific ----
     { wp: ["YOK", "HON"], w: "secondary" },
@@ -3094,14 +3108,24 @@ function drawAtlasDecorations(parent) {
     { wp: ["SFO", "VAN"], w: "secondary" },
     { wp: ["VAN", "YOK"], w: "secondary" },
 
-    // ---- Americas (Pacific side) ----
+    // ---- US West Coast hub at LA ----
+    { wp: ["LAX", "SFO"], w: "secondary" },
+    { wp: ["LAX", "HON"], w: "primary" },
+    { wp: ["LAX", "YOK"], w: "tertiary" },
+    { wp: ["LAX", "PAN"], w: "secondary" },
+
+    // ---- Americas (Pacific side; no PAN-VAL, GC crosses Peru) ----
     { wp: ["SFO", "PAN"], w: "secondary" },
-    { wp: ["PAN", "VAL"], w: "secondary" },
     { wp: ["PAN", "NYC"], w: "secondary" },
 
-    // ---- Australia / Oceania ----
+    // ---- US East Coast hub at Miami ----
+    { wp: ["MIA", "NYC"], w: "secondary" },
+    { wp: ["MIA", "PAN"], w: "secondary" },
+    { wp: ["MIA", "LIS"], w: "tertiary" },
+    { wp: ["MIA", "RIO"], w: "tertiary" },
+
+    // ---- Australia / Oceania (no SYD-DAR, GC crosses Australia) ----
     { wp: ["SYD", "AKL"], w: "secondary" },
-    { wp: ["SYD", "DAR"], w: "secondary" },
     { wp: ["DAR", "SIN"], w: "secondary" },
 
     // ---- Great Southern Ocean ----
@@ -3111,12 +3135,11 @@ function drawAtlasDecorations(parent) {
   ROUTES.forEach(r => {
     const line = waypointRoute(r.wp);
     if (!line) return;
-    if (routeCrossesLand(line.coordinates, 2)) {
-      // Dev-time belt-and-suspenders: if a route still passes over
-      // land, render it tertiary-faint so the "oops it's on land"
-      // doesn't scream; this also surfaces routes needing waypoints.
-      r.w = "tertiary";
-    }
+    // Hard rule: ships don't cross land. If the great-circle track
+    // passes over any continent, drop the route entirely rather than
+    // render it faintly — a faint line through Peru is still a line
+    // through Peru.
+    if (routeCrossesLand(line.coordinates, 2)) return;
     g.append("path").datum(line).attr("class", "deco-route-ghost").attr("d", pathGen);
     g.append("path").datum(line).attr("class", "deco-route deco-route-" + r.w).attr("d", pathGen);
   });
@@ -3159,7 +3182,8 @@ function drawAtlasDecorations(parent) {
   // ---------- port dots + labels ----------
   // Only label the hubs; labels on every port would be a mess.
   const LABEL_PORTS = ["NYC", "LON", "LIS", "RIO", "CPT", "BOM", "SIN",
-                       "HKG", "YOK", "SYD", "SFO", "HON", "PAN", "SUE"];
+                       "HKG", "YOK", "SYD", "SFO", "HON", "PAN", "SUE",
+                       "LAX", "MIA", "MBS"];
   const labelOffsets = {  // hand-tuned so labels sit off the coast
     NYC: [-3, -2, "end"],   LON: [ 3, -2, "start"],
     LIS: [-3,  3, "end"],   RIO: [ 3,  3, "start"],
@@ -3168,6 +3192,8 @@ function drawAtlasDecorations(parent) {
     YOK: [ 3,  2, "start"], SYD: [ 3,  3, "start"],
     SFO: [-3, -2, "end"],   HON: [ 3,  3, "start"],
     PAN: [-3,  4, "end"],   SUE: [ 3, -2, "start"],
+    LAX: [-3,  4, "end"],   MIA: [ 3,  3, "start"],
+    MBS: [ 3,  3, "start"],
   };
   Object.entries(PORTS).forEach(([key, p]) => {
     const pt = projection(p.ll);
