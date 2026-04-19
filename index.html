@@ -1563,17 +1563,19 @@
      plaque and the coastlines. Applied via CSS `filter: url(#hudSketch)`
      on the ::before / ::after rules of every .hud element. -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-  <!-- Filter regions are deliberately tight (x:-2%, y:-8%, +4%/+16%)
-       so the displaced border pixels can't bleed more than a couple
-       of px past the card's bounding box — otherwise the outer rules
-       of two stacked cards visually collide in the gap between them. -->
-  <filter id="hudSketch" x="-2%" y="-8%" width="104%" height="116%">
-    <feTurbulence type="fractalNoise" baseFrequency="0.045" numOctaves="2" seed="31" result="noise"/>
-    <feDisplacementMap in="SourceGraphic" in2="noise" scale="2.2" xChannelSelector="R" yChannelSelector="G"/>
-  </filter>
-  <filter id="hudSketchFine" x="-2%" y="-8%" width="104%" height="116%">
-    <feTurbulence type="fractalNoise" baseFrequency="0.08" numOctaves="2" seed="47" result="noise"/>
+  <!-- Tight filter regions in both axes. Previously x:-2% on a 700px-
+       wide card meant displaced pixels could stray 14+px outside the
+       element — which manifested as a "ghost" border wrapping well
+       beyond the actual control strip. Shrunk to 0.5% horizontally
+       and 5% vertically; scale dropped so the wobble stays close to
+       the card edge. -->
+  <filter id="hudSketch" x="-0.5%" y="-5%" width="101%" height="110%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="2" seed="31" result="noise"/>
     <feDisplacementMap in="SourceGraphic" in2="noise" scale="1.4" xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
+  <filter id="hudSketchFine" x="-0.5%" y="-5%" width="101%" height="110%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.09" numOctaves="2" seed="47" result="noise"/>
+    <feDisplacementMap in="SourceGraphic" in2="noise" scale="0.9" xChannelSelector="R" yChannelSelector="G"/>
   </filter>
 </svg>
 
@@ -4376,53 +4378,19 @@ if ("speechSynthesis" in window) {
 function pickBritishVoice() {
   const voices = getVoices();
   if (!voices.length) return null;
-  // Explicit blacklist. Google network voices silently drop utterances
-  // (see SessionLog). The "Compact" suffix is the tinny macOS variant.
-  // The named male / gag Siri voices and older-lady voices get vetoed
-  // outright so the picker can't fall through to them — on a typical
-  // modern Mac this leaves Flo / Sandy / Shelley for en-GB.
-  // Sandy joins the blacklist — user described her as "underwater
-  // dying". Grandma is a gag elderly-lady voice. Daniel/Grandpa/Eddy/
-  // Reed/Rocko are male or ambiguous. Google network voices silently
-  // drop utterances (SessionLog). Compact = tinny legacy fallback.
-  const blacklist = /(Google|Compact|Daniel|Grandma|Grandpa|Eddy|Reed|Rocko|Sandy)/i;
-  const okVoices = voices.filter(v => !blacklist.test(v.name));
-  // British female voices, in explicit preference order. On the user's
-  // Sequoia Mac the only acceptable en-GB Siri voices left after the
-  // blacklist are Flo and Shelley. Kate/Martha/Serena/Microsoft
-  // variants sit below as fallbacks for machines that do have them.
-  const gbPrefs = [
-    /Flo.*Premium/i, /Flo.*Enhanced/i, /^Flo$/i, /Flo\s*\(/i,
-    /Shelley.*Premium/i, /Shelley.*Enhanced/i, /^Shelley$/i, /Shelley\s*\(/i,
-    /Kate.*Premium/i, /Kate.*Enhanced/i, /Kate/i,
-    /Martha.*Premium/i, /Martha.*Enhanced/i, /Martha/i,
-    /Serena.*Premium/i, /Serena.*Enhanced/i, /Serena/i,
-    /Microsoft Sonia/i, /Microsoft Libby/i, /Microsoft Hazel/i,
-    /Stephanie/i, /Amelia/i,
-  ];
-  // Irish / Scottish female voices — acceptable British-isles accent
-  // if no English-English options are installed.
-  const isleFemalePrefs = [/Moira/i, /Fiona/i];
-  // Last-resort female English voices (non-British) — Samantha on
-  // macOS/iOS, Zira/Jenny on Windows, etc. Better female-American
-  // than defaulting to a random male voice.
+  // Restored to the original simple picker. On the user's Mac this
+  // resolves to Samantha (macOS US female) because no Kate/Martha/
+  // Serena are installed — and Samantha is what sounded normal
+  // pre-session. Google network voices stay banned (they silently
+  // drop utterances — see SessionLog).
+  const gbFemaleNames = /(Kate|Serena|Martha|Karen|Moira|Fiona|Stephanie|Susan|Amelia|Microsoft Libby|Microsoft Sonia|Microsoft Hazel)/i;
   const anyFemaleEn = /(Samantha|Zira|Jenny|Aria|Nora|Ava|Allison|Susan|Tessa|Veena|Karen)/i;
-  for (const pref of gbPrefs) {
-    const v = okVoices.find(vv => /en.?GB/i.test(vv.lang) && pref.test(vv.name));
-    if (v) return v;
-  }
-  for (const pref of isleFemalePrefs) {
-    const v = okVoices.find(vv => /^en/i.test(vv.lang) && pref.test(vv.name));
-    if (v) return v;
-  }
-  for (const pref of gbPrefs) {
-    const v = okVoices.find(vv => /^en/i.test(vv.lang) && pref.test(vv.name));
-    if (v) return v;
-  }
-  const femaleEn = okVoices.find(v => /^en/i.test(v.lang) && anyFemaleEn.test(v.name));
+  const okVoices = voices.filter(v => !/Google/i.test(v.name));
+  const gbFemale = okVoices.find(v => /en.?GB/i.test(v.lang) && gbFemaleNames.test(v.name));
+  const femaleEn = okVoices.find(v => /^en/i.test(v.lang) && (gbFemaleNames.test(v.name) || anyFemaleEn.test(v.name)));
   const anyGB = okVoices.find(v => /en.?GB/i.test(v.lang));
   const anyEn = okVoices.find(v => /^en/i.test(v.lang));
-  return femaleEn || anyGB || anyEn || okVoices[0] || voices[0] || null;
+  return gbFemale || femaleEn || anyGB || anyEn || okVoices[0] || voices[0] || null;
 }
 
 function speakBritish(text) {
