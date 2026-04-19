@@ -333,9 +333,11 @@
     position: fixed;
     background: var(--card-bg);
     border-radius: 3px;
-    box-shadow:
-      0 6px 20px rgba(30, 58, 95, 0.10),
-      0 1px 3px rgba(0, 0, 0, 0.04);
+    /* Symmetric soft glow — a downward-offset shadow was bleeding
+       through the 22px stack gap and reading as a "continuous" left
+       edge spanning both cards. The sketched border carries the
+       visual weight now; the glow is just a hint of paper lift. */
+    box-shadow: 0 0 12px rgba(30, 58, 95, 0.08);
   }
   .hud::before,
   .hud::after {
@@ -1563,19 +1565,17 @@
      plaque and the coastlines. Applied via CSS `filter: url(#hudSketch)`
      on the ::before / ::after rules of every .hud element. -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-  <!-- Tight filter regions in both axes. Previously x:-2% on a 700px-
-       wide card meant displaced pixels could stray 14+px outside the
-       element — which manifested as a "ghost" border wrapping well
-       beyond the actual control strip. Shrunk to 0.5% horizontally
-       and 5% vertically; scale dropped so the wobble stays close to
-       the card edge. -->
-  <filter id="hudSketch" x="-0.5%" y="-5%" width="101%" height="110%">
+  <!-- Filter region is tight enough that displaced pixels stay close
+       to each card's actual edge (was bleeding 14+px out earlier).
+       Scale matches the cartouche's handSketch filter (1.6) so the
+       HUD borders read with the same dip-pen wobble as the plaque. -->
+  <filter id="hudSketch" x="-1%" y="-10%" width="102%" height="120%">
     <feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="2" seed="31" result="noise"/>
-    <feDisplacementMap in="SourceGraphic" in2="noise" scale="1.4" xChannelSelector="R" yChannelSelector="G"/>
+    <feDisplacementMap in="SourceGraphic" in2="noise" scale="1.8" xChannelSelector="R" yChannelSelector="G"/>
   </filter>
-  <filter id="hudSketchFine" x="-0.5%" y="-5%" width="101%" height="110%">
+  <filter id="hudSketchFine" x="-1%" y="-10%" width="102%" height="120%">
     <feTurbulence type="fractalNoise" baseFrequency="0.09" numOctaves="2" seed="47" result="noise"/>
-    <feDisplacementMap in="SourceGraphic" in2="noise" scale="0.9" xChannelSelector="R" yChannelSelector="G"/>
+    <feDisplacementMap in="SourceGraphic" in2="noise" scale="1.2" xChannelSelector="R" yChannelSelector="G"/>
   </filter>
 </svg>
 
