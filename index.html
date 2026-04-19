@@ -325,24 +325,26 @@
   }
 
   /* HUD — cartouche-style double rule. Outer stroke is a plain CSS
-     border on the card itself; inner stroke is a plain CSS border on
-     ::after, inset 4px. No filters, no pseudo-element trickery. Each
-     .hud element (title / score / toolbar / prompt) gets its own pair
-     independently, so modules stacked in .prompt-stack remain two
-     separately stroked plaques, never one grouped box. */
+     border on the card; inner stroke is a plain CSS border on ::after
+     inset 3px. Sharp corners to match the cartouche plaque. No
+     filters, no pseudo-element trickery. Each .hud gets its own pair
+     scoped to itself — NOTE: `.hud` must stay positioned (fixed OR
+     relative) so the absolutely-positioned ::after binds to it, not
+     to a positioned ancestor like .prompt-stack. If the ::after
+     binds to an ancestor, both cards' inner rules coincide and draw
+     one rectangle around the whole stack. */
   .hud {
     position: fixed;
     background: var(--card-bg);
-    border: 1.5px solid var(--land-stroke);
-    border-radius: 3px;
+    border: 1px solid var(--land-stroke);
+    border-radius: 0;
   }
   .hud::after {
     content: "";
     position: absolute;
-    inset: 4px;
+    inset: 3px;
     border: 1px solid var(--land-stroke);
-    border-radius: 2px;
-    opacity: 0.5;
+    opacity: 0.4;
     pointer-events: none;
   }
 
@@ -416,7 +418,7 @@
     z-index: 10;
   }
   .prompt-stack .hud {
-    position: static;
+    position: relative;
     width: auto;
     left: auto; right: auto; bottom: auto; top: auto; transform: none;
   }
