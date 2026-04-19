@@ -28,16 +28,15 @@
     --text-light: #999999;
     --charcoal: #2D2D2D;
 
-    /* Vintage-atlas palette: warm tan paper for the sea, slightly
-       lighter cream for the land, dark-chocolate coastlines, and a
-       muted sepia graticule. Continents are defined by the dark
-       coastline stroke + sea-shading halo rather than by a strong
-       fill contrast — matches the hand-drawn aesthetic. */
-    --ocean: #E9D4A5;
-    --ocean-deep: #C9A573;
-    --land: #F0DEB4;
-    --land-stroke: #4A2E16;
-    --graticule: #8C6B3A;
+    /* Vintage-atlas palette — warmer / more saturated than our first
+       pass, to hit the richer golden-brown tones of the reference
+       rather than a flat tan. Continents are defined by the dark
+       coastline stroke + sea-shading halo rather than fill contrast. */
+    --ocean: #DDBF8A;
+    --ocean-deep: #A57A46;
+    --land: #E8C99A;
+    --land-stroke: #2E1A06;
+    --graticule: #6F4C20;
 
     --good: #6E8B6E;
     --good-soft: #C4D4BC;
@@ -95,17 +94,16 @@
   }
   svg#map { width: 100%; height: 100%; display: block; }
 
-  /* Multi-layer sea-shading halo: three stacked drop-shadows at
-     progressively wider blur + fainter opacity create concentric
-     "ripple" bands around every coastline, the way hand-drawn old
-     atlases used dozens of parallel shoreline lines to indicate
-     coastal waters. Much cheaper than a per-country filter and
-     gives the ocean genuine dimension near the land. */
-  g.countries {
+  /* Multi-layer sea-shading halo applied at the parent wrap so the
+     child .countries group can run its own SVG wobble filter without
+     the two filter chains fighting each other. Three stacked drop-
+     shadows at increasing blur + fading opacity produce concentric
+     brown "ripple" bands fading out from every coastline. */
+  g.countries-wrap {
     filter:
-      drop-shadow(0 0 1.5px rgba(74, 46, 22, 0.70))
-      drop-shadow(0 0 5px   rgba(74, 46, 22, 0.32))
-      drop-shadow(0 0 14px  rgba(74, 46, 22, 0.14));
+      drop-shadow(0 0 1.5px rgba(46, 26, 6, 0.75))
+      drop-shadow(0 0 5px   rgba(46, 26, 6, 0.35))
+      drop-shadow(0 0 14px  rgba(46, 26, 6, 0.16));
   }
   .country {
     fill: var(--land);
@@ -2183,6 +2181,20 @@ function setupMap() {
   pathGen = d3.geoPath(projection);
 
   svg.selectAll("*").remove();
+
+  // SVG filters: a subtle coastline wobble for the countries group.
+  // Low-frequency fractal noise displaces the vector edges ~2.5px,
+  // giving otherwise-crisp polygons the feel of a hand-drawn atlas.
+  const defs = svg.append("defs");
+  const wobble = defs.append("filter")
+    .attr("id", "coastWobble")
+    .attr("x", "-5%").attr("y", "-5%")
+    .attr("width", "110%").attr("height", "110%");
+  wobble.html(`
+    <feTurbulence type="fractalNoise" baseFrequency="0.018" numOctaves="2" seed="11" result="wobNoise"/>
+    <feDisplacementMap in="SourceGraphic" in2="wobNoise" scale="2.6" xChannelSelector="R" yChannelSelector="G"/>
+  `);
+
   rootG = svg.append("g").attr("class", "root");
 
   gGrat = rootG.append("g").attr("class", "grat-layer");
@@ -2192,7 +2204,20 @@ function setupMap() {
   const equator = { type: "LineString", coordinates: [[-180, 0], [-90, 0], [0, 0], [90, 0], [180, 0]] };
   gGrat.append("path").datum(equator).attr("class", "equator").attr("d", pathGen);
 
-  gMap = rootG.append("g").attr("class", "countries");
+  // Two nested groups so the halos (CSS drop-shadows on the parent)
+  // stack on top of the coastline wobble (SVG filter on the child).
+  // Applying both to the same element produces inconsistent results
+  // across browsers.
+  const gMapWrap = rootG.append("g").attr("class", "countries-wrap");
+  gMap = gMapWrap.append("g").attr("class", "countries")
+    .attr("filter", "url(#coastWobble)");
+
+  // Static atlas decorations — whales, ships, compass rose — drawn
+  // behind the ocean labels but above the countries/graticule. No
+  // animation, no interaction; purely to give the map the feel of
+  // a hand-drawn chart where cartographers filled empty ocean with
+  // sea creatures and ships for flavour.
+  drawAtlasDecorations(rootG);
 
   // Ocean labels (hidden by default; shown after answering)
   const gOceans = rootG.append("g").attr("class", "ocean-labels");
@@ -2596,6 +2621,91 @@ function shuffle(arr) {
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
+}
+
+// Paint the static old-atlas ocean furniture: a compass rose, a couple
+// of whales, a tall ship. Positioned by lon/lat so they move with the
+// projection/zoom. Drawn once per setupMap call; no animation.
+function drawAtlasDecorations(parent) {
+  const g = parent.append("g").attr("class", "decorations").attr("pointer-events", "none");
+
+  // ---------- compass rose ---------- (NW Pacific, between Alaska and Kamchatka)
+  const compassPt = projection([-175, 40]);
+  if (compassPt) {
+    const c = g.append("g").attr("class", "deco-compass")
+      .attr("transform", `translate(${compassPt[0]}, ${compassPt[1]})`);
+    const ink = "var(--land-stroke)";
+    const sw = 0.35;
+    // Outer ring
+    c.append("circle").attr("r", 24).attr("fill", "none").attr("stroke", ink).attr("stroke-width", sw).attr("opacity", 0.55);
+    c.append("circle").attr("r", 18).attr("fill", "none").attr("stroke", ink).attr("stroke-width", sw).attr("opacity", 0.45);
+    // Principal star: four cardinal points
+    c.append("path").attr("d", "M0,-22 L4,0 L0,22 L-4,0 Z").attr("fill", ink).attr("opacity", 0.75);
+    c.append("path").attr("d", "M-22,0 L0,4 L22,0 L0,-4 Z").attr("fill", ink).attr("opacity", 0.55);
+    // Secondary star: diagonals
+    c.append("path").attr("d", "M-13,-13 L0,-3 L13,13 L-3,0 Z").attr("fill", ink).attr("opacity", 0.35);
+    c.append("path").attr("d", "M13,-13 L-3,0 L-13,13 L0,-3 Z").attr("fill", ink).attr("opacity", 0.35);
+    // Center pip
+    c.append("circle").attr("r", 1.4).attr("fill", ink);
+    // Cardinal labels
+    const letters = [["N", 0, -28], ["E", 28, 1.5], ["S", 0, 32], ["W", -28, 1.5]];
+    letters.forEach(([t, x, y]) => {
+      c.append("text").attr("x", x).attr("y", y).attr("text-anchor", "middle")
+        .attr("font-family", "var(--font-display)").attr("font-size", 5).attr("fill", ink).attr("opacity", 0.75).text(t);
+    });
+  }
+
+  // ---------- whales ---------- side-profile silhouettes
+  const whalePath = "M-14,0 C-11,-4 -4,-4 2,-3 C7,-2.5 11,-1.5 14,0 C11,1.5 7,2.5 2,3 C-4,4 -11,4 -14,0 Z M-14,0 L-19,-3 L-16,0 L-19,3 Z";
+  const whales = [
+    { lonlat: [ 155, 35], scale: 0.9, rot: -10 }, // North Pacific
+    { lonlat: [-28, -25], scale: 1.0, rot:  14 }, // South Atlantic
+    { lonlat: [ 90, -40], scale: 0.8, rot:  -5 }, // Southern Indian
+  ];
+  whales.forEach(w => {
+    const pt = projection(w.lonlat);
+    if (!pt) return;
+    const wg = g.append("g")
+      .attr("class", "deco-whale")
+      .attr("transform", `translate(${pt[0]}, ${pt[1]}) rotate(${w.rot}) scale(${w.scale})`);
+    wg.append("path").attr("d", whalePath).attr("fill", "var(--land-stroke)").attr("opacity", 0.6);
+    // Tiny spout plume above the blowhole
+    wg.append("path").attr("d", "M4,-3 C3.5,-5 4.5,-7 4,-9 M2.5,-3 C2.2,-5 3.2,-6.5 3,-8")
+      .attr("fill", "none").attr("stroke", "var(--land-stroke)").attr("stroke-width", 0.4)
+      .attr("opacity", 0.55).attr("stroke-linecap", "round");
+  });
+
+  // ---------- tall ships ----------
+  const ships = [
+    { lonlat: [-40,  45], scale: 1.0, rot:   2 }, // North Atlantic
+    { lonlat: [ 75,   5], scale: 0.9, rot:  -3 }, // Indian Ocean
+    { lonlat: [-110, -10], scale: 0.85, rot:  5 }, // Eastern Pacific
+  ];
+  ships.forEach(s => {
+    const pt = projection(s.lonlat);
+    if (!pt) return;
+    const sg = g.append("g")
+      .attr("class", "deco-ship")
+      .attr("transform", `translate(${pt[0]}, ${pt[1]}) rotate(${s.rot}) scale(${s.scale})`);
+    const ink = "var(--land-stroke)";
+    // Hull
+    sg.append("path").attr("d", "M-10,1.8 L-7.5,5 L7.5,5 L10,1.8 Z").attr("fill", ink).attr("opacity", 0.7);
+    // Masts
+    [-5, 0, 5].forEach((x, i) => {
+      const h = [9, 11, 9][i];
+      sg.append("line").attr("x1", x).attr("y1", 1.8).attr("x2", x).attr("y2", -h)
+        .attr("stroke", ink).attr("stroke-width", 0.5).attr("opacity", 0.7);
+    });
+    // Square sails (main courses)
+    sg.append("rect").attr("x", -7.5).attr("y", -5).attr("width", 5).attr("height", 5)
+      .attr("fill", ink).attr("opacity", 0.22).attr("stroke", ink).attr("stroke-width", 0.3);
+    sg.append("rect").attr("x", -2.5).attr("y", -7).attr("width", 5).attr("height", 7)
+      .attr("fill", ink).attr("opacity", 0.22).attr("stroke", ink).attr("stroke-width", 0.3);
+    sg.append("rect").attr("x",  2.5).attr("y", -5).attr("width", 5).attr("height", 5)
+      .attr("fill", ink).attr("opacity", 0.22).attr("stroke", ink).attr("stroke-width", 0.3);
+    // Pennant flags (thin triangles off the top of each mast)
+    sg.append("path").attr("d", "M0,-11 L3,-10 L0,-9 Z").attr("fill", ink).attr("opacity", 0.65);
+  });
 }
 
 function isRegionFiltered() {
