@@ -28,15 +28,17 @@
     --text-light: #999999;
     --charcoal: #2D2D2D;
 
-    /* Vintage-atlas palette — warmer / more saturated than our first
-       pass, to hit the richer golden-brown tones of the reference
-       rather than a flat tan. Continents are defined by the dark
-       coastline stroke + sea-shading halo rather than fill contrast. */
-    --ocean: #DDBF8A;
-    --ocean-deep: #A57A46;
-    --land: #E8C99A;
-    --land-stroke: #2E1A06;
-    --graticule: #6F4C20;
+    /* Vintage-atlas palette — lighter, airier tones closer to a
+       sun-bleached Dribbble-style travel chart. Continents are defined
+       by the dark coastline stroke + sea-shading halo rather than fill
+       contrast. Keep ocean/land fairly close in value so the ink
+       coastline carries the separation. */
+    --ocean: #F0DDB0;
+    --ocean-deep: #C9A06A;
+    --land: #FBEBC4;
+    --land-stroke: #3A2410;
+    --graticule: #8A6A36;
+    --ink-soft: rgba(58, 36, 16, 0.7);
 
     --good: #6E8B6E;
     --good-soft: #C4D4BC;
@@ -66,7 +68,7 @@
   #mapWrap {
     position: fixed; inset: 0;
     background:
-      radial-gradient(ellipse at 50% 45%, #F0DEB4 0%, var(--ocean) 48%, var(--ocean-deep) 95%);
+      radial-gradient(ellipse at 50% 45%, #FBEBC4 0%, var(--ocean) 52%, var(--ocean-deep) 98%);
   }
   /* Layered paper texture. Two noise tiles at different scales + a
      corner vignette build up an aged-atlas feel: coarse fibres for
@@ -77,7 +79,7 @@
     content: "";
     position: absolute; inset: 0;
     pointer-events: none;
-    background: radial-gradient(ellipse at center, transparent 50%, rgba(74, 46, 22, 0.28) 100%);
+    background: radial-gradient(ellipse at center, transparent 55%, rgba(120, 80, 36, 0.18) 100%);
   }
   #mapWrap::after {
     /* Stacked turbulence tiles — one coarse, one fine — multiplied
@@ -85,7 +87,7 @@
     content: "";
     position: absolute; inset: 0;
     pointer-events: none;
-    opacity: 0.45;
+    opacity: 0.28;
     mix-blend-mode: multiply;
     background-image:
       url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='380' height='380'><filter id='f'><feTurbulence type='fractalNoise' baseFrequency='0.32' numOctaves='2' stitchTiles='stitch' seed='7'/><feColorMatrix values='0 0 0 0 0.30  0 0 0 0 0.20  0 0 0 0 0.08  0 0 0 0.5 0'/></filter><rect width='100%25' height='100%25' filter='url(%23f)'/></svg>"),
@@ -101,9 +103,9 @@
      brown "ripple" bands fading out from every coastline. */
   g.countries-wrap {
     filter:
-      drop-shadow(0 0 1.5px rgba(46, 26, 6, 0.75))
-      drop-shadow(0 0 5px   rgba(46, 26, 6, 0.35))
-      drop-shadow(0 0 14px  rgba(46, 26, 6, 0.16));
+      drop-shadow(0 0 1.3px rgba(58, 36, 16, 0.55))
+      drop-shadow(0 0 4.5px rgba(120, 78, 32, 0.28))
+      drop-shadow(0 0 13px  rgba(140, 96, 42, 0.12));
   }
   .country {
     fill: var(--land);
@@ -111,7 +113,7 @@
     stroke-width: 0.7;
     transition: fill 0.25s ease, stroke 0.25s ease;
   }
-  .country.hover { fill: #E3CC8F; cursor: help; }
+  .country.hover { fill: #F5DFA8; cursor: help; }
 
   /* Persistent session history fills — override land */
   .country.hist-correct { fill: var(--good-soft); stroke: #96AF90; }
@@ -131,7 +133,7 @@
   .ocean-label {
     font-family: var(--font-body);
     font-style: italic;
-    fill: #6E4A22;
+    fill: #825832;
     letter-spacing: 0.22em;
     text-transform: uppercase;
     user-select: none;
@@ -172,9 +174,39 @@
     100% { transform: scale(3.4); opacity: 0;    stroke-width: 0.5; }
   }
 
-  .graticule { fill: none; stroke: var(--graticule); stroke-width: 0.4; stroke-opacity: 0.55; }
-  .equator { stroke: var(--graticule); stroke-width: 0.55; stroke-dasharray: 3 5; fill: none; stroke-opacity: 0.7; }
-  .sphere { fill: none; stroke: var(--land-stroke); stroke-width: 0.8; stroke-opacity: 0.65; }
+  .graticule { fill: none; stroke: var(--graticule); stroke-width: 0.35; stroke-opacity: 0.38; }
+  .equator { stroke: var(--graticule); stroke-width: 0.55; stroke-dasharray: 3 5; fill: none; stroke-opacity: 0.55; }
+  .sphere { fill: none; stroke: var(--land-stroke); stroke-width: 0.8; stroke-opacity: 0.55; }
+
+  /* Decorative layer — whales, ships, compass rose, sea serpent, voyage
+     lines, cartouche. All drawn in land-stroke ink at muted opacities so
+     they read as hand-illustrated atlas furniture. Pointer events off
+     so they never swallow country clicks. */
+  .decorations { pointer-events: none; }
+  .deco-ink { fill: none; stroke: var(--land-stroke); stroke-linecap: round; stroke-linejoin: round; }
+  .deco-route {
+    fill: none; stroke: var(--land-stroke);
+    stroke-width: 0.75; stroke-opacity: 0.52;
+    stroke-dasharray: 2.2 2.2; stroke-linecap: round;
+  }
+  .deco-rhumb { stroke: var(--land-stroke); stroke-opacity: 0.28; fill: none; stroke-width: 0.35; }
+  .deco-cartouche-text {
+    font-family: var(--font-display);
+    font-size: 7px;
+    letter-spacing: 0.28em;
+    fill: var(--land-stroke);
+    opacity: 0.78;
+    text-anchor: middle;
+  }
+  .deco-island-dot { fill: var(--land-stroke); opacity: 0.65; }
+  .deco-island-label {
+    font-family: var(--font-body);
+    font-style: italic;
+    font-size: 4.5px;
+    fill: var(--land-stroke);
+    opacity: 0.65;
+    letter-spacing: 0.08em;
+  }
 
   /* HUD — parchment cards */
   .hud {
@@ -2623,44 +2655,130 @@ function shuffle(arr) {
   return a;
 }
 
-// Paint the static old-atlas ocean furniture: a compass rose, a couple
-// of whales, a tall ship. Positioned by lon/lat so they move with the
-// projection/zoom. Drawn once per setupMap call; no animation.
+// Paint the static old-atlas ocean furniture: compass rose with rhumb
+// lines, a sea serpent, whales, tall ships, a few island dots, a
+// cartouche, and dashed voyage routes between continents. Positioned by
+// lon/lat so they move with the projection/zoom. Drawn once per
+// setupMap call; no animation, no interaction.
 function drawAtlasDecorations(parent) {
-  const g = parent.append("g").attr("class", "decorations").attr("pointer-events", "none");
+  const g = parent.append("g").attr("class", "decorations");
+  const ink = "var(--land-stroke)";
 
-  // ---------- compass rose ---------- (NW Pacific, between Alaska and Kamchatka)
+  // ---------- dashed voyage routes ---------- (draw FIRST so creatures sit on top)
+  // A few great-circle-ish paths between ports that evoke trade routes,
+  // like rhumb lines from an explorer's chart. Drawn with d3.geoPath on
+  // LineStrings so they bend correctly with the Natural-Earth projection.
+  const routes = [
+    [[-9, 38], [-30, 12], [-43, -8], [-63, -34]],          // Lisbon → Brazil / Argentina (trans-Atlantic)
+    [[-74, 40], [-25, 44], [ 11, 40]],                      // New York → Azores → Barcelona
+    [[ 32, 30], [ 68, 18], [ 90, 10], [114, 15]],           // Suez → Indian → S. China Sea
+    [[151,-34], [178,-22], [-150,-12], [-72,-34]],          // Sydney → Pacific → Valparaíso
+    [[ 18,-34], [ 60,-36], [115,-36]],                      // Cape Town → Perth (roaring 40s)
+  ];
+  routes.forEach(coords => {
+    const line = { type: "LineString", coordinates: coords };
+    g.append("path").datum(line).attr("class", "deco-route").attr("d", pathGen);
+    // Port pips at each endpoint
+    [coords[0], coords[coords.length - 1]].forEach(ll => {
+      const pt = projection(ll);
+      if (!pt) return;
+      g.append("circle").attr("class", "deco-ink").attr("cx", pt[0]).attr("cy", pt[1]).attr("r", 1.1)
+        .attr("fill", ink).attr("stroke", "none").attr("opacity", 0.55);
+    });
+  });
+
+  // ---------- wave scallops ---------- (subtle ink squiggles in empty ocean)
+  const scallopPath = "M0,0 Q1.8,-1.6 3.6,0 Q5.4,1.6 7.2,0 Q9,-1.6 10.8,0";
+  const scallops = [
+    { lonlat: [-155,   8], rot: -3 }, { lonlat: [-135, -30], rot:  5 },
+    { lonlat: [ -15,   8], rot:  2 }, { lonlat: [ -22,  22], rot: -4 },
+    { lonlat: [  60, -12], rot:  3 }, { lonlat: [ 125, -18], rot: -2 },
+    { lonlat: [-120,  30], rot:  1 }, { lonlat: [ 175, -38], rot:  4 },
+  ];
+  scallops.forEach(s => {
+    const pt = projection(s.lonlat);
+    if (!pt) return;
+    g.append("path").attr("class", "deco-ink")
+      .attr("d", scallopPath)
+      .attr("transform", `translate(${pt[0]},${pt[1]}) rotate(${s.rot})`)
+      .attr("stroke", ink).attr("stroke-width", 0.4).attr("opacity", 0.32);
+  });
+
+  // ---------- compass rose with rhumb lines ---------- (NW Pacific, quiet water)
   const compassPt = projection([-175, 40]);
   if (compassPt) {
     const c = g.append("g").attr("class", "deco-compass")
-      .attr("transform", `translate(${compassPt[0]}, ${compassPt[1]})`);
-    const ink = "var(--land-stroke)";
+      .attr("transform", `translate(${compassPt[0]}, ${compassPt[1]}) scale(1.3)`);
     const sw = 0.35;
-    // Outer ring
-    c.append("circle").attr("r", 24).attr("fill", "none").attr("stroke", ink).attr("stroke-width", sw).attr("opacity", 0.55);
-    c.append("circle").attr("r", 18).attr("fill", "none").attr("stroke", ink).attr("stroke-width", sw).attr("opacity", 0.45);
-    // Principal star: four cardinal points
-    c.append("path").attr("d", "M0,-22 L4,0 L0,22 L-4,0 Z").attr("fill", ink).attr("opacity", 0.75);
-    c.append("path").attr("d", "M-22,0 L0,4 L22,0 L0,-4 Z").attr("fill", ink).attr("opacity", 0.55);
-    // Secondary star: diagonals
-    c.append("path").attr("d", "M-13,-13 L0,-3 L13,13 L-3,0 Z").attr("fill", ink).attr("opacity", 0.35);
-    c.append("path").attr("d", "M13,-13 L-3,0 L-13,13 L0,-3 Z").attr("fill", ink).attr("opacity", 0.35);
+    // 16 thin rhumb lines radiating out — stop just outside the outer ring
+    for (let i = 0; i < 16; i++) {
+      const a = (i * Math.PI * 2) / 16;
+      const x1 = Math.cos(a) * 26, y1 = Math.sin(a) * 26;
+      const x2 = Math.cos(a) * 62, y2 = Math.sin(a) * 62;
+      c.append("line").attr("class", "deco-rhumb")
+        .attr("x1", x1).attr("y1", y1).attr("x2", x2).attr("y2", y2);
+    }
+    // Concentric rings
+    c.append("circle").attr("r", 26).attr("fill", "none").attr("stroke", ink).attr("stroke-width", sw).attr("opacity", 0.6);
+    c.append("circle").attr("r", 20).attr("fill", "none").attr("stroke", ink).attr("stroke-width", sw).attr("opacity", 0.5);
+    c.append("circle").attr("r", 11).attr("fill", "none").attr("stroke", ink).attr("stroke-width", sw).attr("opacity", 0.4);
+    // Principal star (N/E/S/W) — filled pairs for the classic compass look
+    c.append("path").attr("d", "M0,-24 L4.5,0 L0,24 L-4.5,0 Z").attr("fill", ink).attr("opacity", 0.78);
+    c.append("path").attr("d", "M-24,0 L0,4.5 L24,0 L0,-4.5 Z").attr("fill", ink).attr("opacity", 0.55);
+    // Hollow counter-star behind it for depth
+    c.append("path").attr("d", "M0,-24 L2,0 L0,24 L-2,0 Z").attr("fill", "#FBEBC4").attr("opacity", 0.55);
+    // Diagonal secondary star (NE/SE/SW/NW)
+    c.append("path").attr("d", "M-14,-14 L0,-3 L14,14 L-3,0 Z").attr("fill", ink).attr("opacity", 0.35);
+    c.append("path").attr("d", "M14,-14 L-3,0 L-14,14 L0,-3 Z").attr("fill", ink).attr("opacity", 0.35);
     // Center pip
-    c.append("circle").attr("r", 1.4).attr("fill", ink);
-    // Cardinal labels
-    const letters = [["N", 0, -28], ["E", 28, 1.5], ["S", 0, 32], ["W", -28, 1.5]];
+    c.append("circle").attr("r", 1.5).attr("fill", ink);
+    // Cardinal letters on the inner ring
+    const letters = [["N", 0, -31], ["E", 31, 1.8], ["S", 0, 34], ["W", -31, 1.8]];
     letters.forEach(([t, x, y]) => {
       c.append("text").attr("x", x).attr("y", y).attr("text-anchor", "middle")
-        .attr("font-family", "var(--font-display)").attr("font-size", 5).attr("fill", ink).attr("opacity", 0.75).text(t);
+        .attr("font-family", "var(--font-display)").attr("font-size", 5.2).attr("fill", ink).attr("opacity", 0.8).text(t);
     });
   }
 
-  // ---------- whales ---------- side-profile silhouettes
+  // ---------- sea serpent ---------- (classic "here be dragons" — mid-South-Atlantic)
+  // Sinuous body drawn as a cubic Bézier; scales along the back; spike
+  // fins; small head with an open jaw. The path is laid out in local
+  // coords, then rotated/translated into place.
+  const serpentPt = projection([-30, -8]);
+  if (serpentPt) {
+    const s = g.append("g").attr("class", "deco-serpent")
+      .attr("transform", `translate(${serpentPt[0]}, ${serpentPt[1]}) rotate(-8) scale(1.45)`);
+    // Three-humped body
+    const bodyD = "M-34,0 C-30,-8 -22,-8 -18,0 C-14,8 -6,8 -2,0 C2,-8 10,-8 14,0 C18,8 24,6 30,2";
+    s.append("path").attr("class", "deco-ink").attr("d", bodyD)
+      .attr("stroke", ink).attr("stroke-width", 1.6).attr("opacity", 0.72);
+    // Secondary thicker line to read as a silhouette
+    s.append("path").attr("class", "deco-ink").attr("d", bodyD)
+      .attr("stroke", ink).attr("stroke-width", 0.5).attr("opacity", 0.35)
+      .attr("transform", "translate(0, 1.5)");
+    // Back spikes along each hump crest
+    const spikes = [-26, -18, -10, -2, 6, 14, 22];
+    spikes.forEach(x => {
+      s.append("path").attr("d", `M${x},-3 L${x+1.2},-6.5 L${x+2.4},-3 Z`)
+        .attr("fill", ink).attr("opacity", 0.55);
+    });
+    // Head + jaw at the leading (right) end
+    s.append("path").attr("d", "M30,2 Q35,0 34,-4 Q31,-6 28,-3 Z")
+      .attr("fill", ink).attr("opacity", 0.7);
+    s.append("path").attr("d", "M32,-1 L36,1 L32,1 Z").attr("fill", ink).attr("opacity", 0.7); // open jaw
+    s.append("circle").attr("cx", 32).attr("cy", -2.2).attr("r", 0.5).attr("fill", "#FBEBC4"); // eye
+    // Tail fork at the trailing (left) end
+    s.append("path").attr("d", "M-34,0 L-40,-3 L-37,0 L-40,3 Z").attr("fill", ink).attr("opacity", 0.65);
+  }
+
+  // ---------- whales ----------
   const whalePath = "M-14,0 C-11,-4 -4,-4 2,-3 C7,-2.5 11,-1.5 14,0 C11,1.5 7,2.5 2,3 C-4,4 -11,4 -14,0 Z M-14,0 L-19,-3 L-16,0 L-19,3 Z";
   const whales = [
-    { lonlat: [ 155, 35], scale: 0.9, rot: -10 }, // North Pacific
-    { lonlat: [-28, -25], scale: 1.0, rot:  14 }, // South Atlantic
-    { lonlat: [ 90, -40], scale: 0.8, rot:  -5 }, // Southern Indian
+    { lonlat: [ 155,  35], scale: 1.5, rot: -10 }, // North Pacific
+    { lonlat: [-140,  18], scale: 1.2, rot:  -4 }, // Mid Pacific
+    { lonlat: [  90, -40], scale: 1.4, rot:  -5 }, // Southern Indian
+    { lonlat: [-135, -52], scale: 1.6, rot:  -8 }, // Southern Pacific
+    { lonlat: [  30, -55], scale: 1.4, rot:  12 }, // South Atlantic / southern ocean
   ];
   whales.forEach(w => {
     const pt = projection(w.lonlat);
@@ -2668,18 +2786,21 @@ function drawAtlasDecorations(parent) {
     const wg = g.append("g")
       .attr("class", "deco-whale")
       .attr("transform", `translate(${pt[0]}, ${pt[1]}) rotate(${w.rot}) scale(${w.scale})`);
-    wg.append("path").attr("d", whalePath).attr("fill", "var(--land-stroke)").attr("opacity", 0.6);
-    // Tiny spout plume above the blowhole
+    wg.append("path").attr("d", whalePath).attr("fill", ink).attr("opacity", 0.62);
     wg.append("path").attr("d", "M4,-3 C3.5,-5 4.5,-7 4,-9 M2.5,-3 C2.2,-5 3.2,-6.5 3,-8")
-      .attr("fill", "none").attr("stroke", "var(--land-stroke)").attr("stroke-width", 0.4)
+      .attr("fill", "none").attr("stroke", ink).attr("stroke-width", 0.4)
       .attr("opacity", 0.55).attr("stroke-linecap", "round");
+    // Tiny eye dot
+    wg.append("circle").attr("cx", 8.5).attr("cy", -0.3).attr("r", 0.28).attr("fill", "#FBEBC4");
   });
 
   // ---------- tall ships ----------
   const ships = [
-    { lonlat: [-40,  45], scale: 1.0, rot:   2 }, // North Atlantic
-    { lonlat: [ 75,   5], scale: 0.9, rot:  -3 }, // Indian Ocean
-    { lonlat: [-110, -10], scale: 0.85, rot:  5 }, // Eastern Pacific
+    { lonlat: [-40,  45], scale: 1.6,  rot:   2 }, // North Atlantic
+    { lonlat: [ 75,   5], scale: 1.5,  rot:  -3 }, // Indian Ocean
+    { lonlat: [-110, -10], scale: 1.4,  rot:   5 }, // Eastern Pacific
+    { lonlat: [ 175,  10], scale: 1.3,  rot:  -6 }, // Mid-Pacific / near Kiribati
+    { lonlat: [-50, -22], scale: 1.4,  rot:   3 }, // South Atlantic (near Brazil)
   ];
   ships.forEach(s => {
     const pt = projection(s.lonlat);
@@ -2687,14 +2808,16 @@ function drawAtlasDecorations(parent) {
     const sg = g.append("g")
       .attr("class", "deco-ship")
       .attr("transform", `translate(${pt[0]}, ${pt[1]}) rotate(${s.rot}) scale(${s.scale})`);
-    const ink = "var(--land-stroke)";
     // Hull
-    sg.append("path").attr("d", "M-10,1.8 L-7.5,5 L7.5,5 L10,1.8 Z").attr("fill", ink).attr("opacity", 0.7);
-    // Masts
+    sg.append("path").attr("d", "M-10,1.8 L-7.5,5 L7.5,5 L10,1.8 Z").attr("fill", ink).attr("opacity", 0.72);
+    // Bowsprit
+    sg.append("line").attr("x1", 10).attr("y1", 1.8).attr("x2", 13.5).attr("y2", 0)
+      .attr("stroke", ink).attr("stroke-width", 0.45).attr("opacity", 0.7);
+    // Three masts
     [-5, 0, 5].forEach((x, i) => {
       const h = [9, 11, 9][i];
       sg.append("line").attr("x1", x).attr("y1", 1.8).attr("x2", x).attr("y2", -h)
-        .attr("stroke", ink).attr("stroke-width", 0.5).attr("opacity", 0.7);
+        .attr("stroke", ink).attr("stroke-width", 0.5).attr("opacity", 0.72);
     });
     // Square sails (main courses)
     sg.append("rect").attr("x", -7.5).attr("y", -5).attr("width", 5).attr("height", 5)
@@ -2703,9 +2826,54 @@ function drawAtlasDecorations(parent) {
       .attr("fill", ink).attr("opacity", 0.22).attr("stroke", ink).attr("stroke-width", 0.3);
     sg.append("rect").attr("x",  2.5).attr("y", -5).attr("width", 5).attr("height", 5)
       .attr("fill", ink).attr("opacity", 0.22).attr("stroke", ink).attr("stroke-width", 0.3);
-    // Pennant flags (thin triangles off the top of each mast)
+    // Tiny topgallant above the main mast
+    sg.append("rect").attr("x", -1.8).attr("y", -10.5).attr("width", 3.6).attr("height", 3)
+      .attr("fill", ink).attr("opacity", 0.22).attr("stroke", ink).attr("stroke-width", 0.3);
+    // Pennant flag off the main mast
     sg.append("path").attr("d", "M0,-11 L3,-10 L0,-9 Z").attr("fill", ink).attr("opacity", 0.65);
+    // Faint wake behind the stern
+    sg.append("path").attr("d", "M-10,4 q-6,-0.5 -12,1 M-10,5 q-5,0.6 -10,2")
+      .attr("fill", "none").attr("stroke", ink).attr("stroke-width", 0.35)
+      .attr("opacity", 0.35).attr("stroke-linecap", "round");
   });
+
+  // ---------- island dots ---------- (tiny ink dots + italic labels for flavour)
+  const islands = [
+    { lonlat: [ -10,  -8], label: "St. Helena" },
+    { lonlat: [-150, -18], label: "Tahiti" },
+    { lonlat: [  57, -20], label: "Mauritius" },
+    { lonlat: [-176, -14], label: "Samoa" },
+    { lonlat: [ -62,  32], label: "Bermuda" },
+  ];
+  islands.forEach(i => {
+    const pt = projection(i.lonlat);
+    if (!pt) return;
+    g.append("circle").attr("class", "deco-island-dot").attr("cx", pt[0]).attr("cy", pt[1]).attr("r", 1);
+    g.append("text").attr("class", "deco-island-label")
+      .attr("x", pt[0] + 2.5).attr("y", pt[1] + 1.6).text(i.label);
+  });
+
+  // ---------- cartouche ---------- (small banner in the empty Southern Ocean)
+  const cartPt = projection([-90, -58]);
+  if (cartPt) {
+    const cart = g.append("g").attr("class", "deco-cartouche")
+      .attr("transform", `translate(${cartPt[0]}, ${cartPt[1]}) scale(1.6)`);
+    // Banner outline
+    cart.append("path").attr("d", "M-48,-10 L48,-10 L54,0 L48,10 L-48,10 L-54,0 Z")
+      .attr("fill", "none").attr("stroke", ink).attr("stroke-width", 0.5).attr("opacity", 0.55);
+    cart.append("path").attr("d", "M-44,-7 L44,-7 L49,0 L44,7 L-44,7 L-49,0 Z")
+      .attr("fill", "none").attr("stroke", ink).attr("stroke-width", 0.35).attr("opacity", 0.4);
+    // Title + subtitle
+    cart.append("text").attr("class", "deco-cartouche-text").attr("y", -0.5)
+      .attr("font-size", 8).text("TERRAE · ORBIS");
+    cart.append("text").attr("class", "deco-cartouche-text").attr("y", 6.5)
+      .attr("font-size", 4).attr("opacity", 0.65).text("a chart for young voyagers");
+    // Flourish ribbons off either end
+    cart.append("path").attr("d", "M-54,0 L-62,-4 L-58,0 L-62,4 Z")
+      .attr("fill", "none").attr("stroke", ink).attr("stroke-width", 0.35).attr("opacity", 0.5);
+    cart.append("path").attr("d", "M54,0 L62,-4 L58,0 L62,4 Z")
+      .attr("fill", "none").attr("stroke", ink).attr("stroke-width", 0.35).attr("opacity", 0.5);
+  }
 }
 
 function isRegionFiltered() {
