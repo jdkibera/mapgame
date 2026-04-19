@@ -69,25 +69,43 @@
     background:
       radial-gradient(ellipse at 50% 45%, #F0DEB4 0%, var(--ocean) 48%, var(--ocean-deep) 95%);
   }
-  /* Paper grain overlay — fractal-noise SVG tile at low opacity, warm
-     sepia tint, multiply-blended so it darkens the paper irregularly
-     and hints at aged texture without dominating. */
-  #mapWrap::after {
+  /* Layered paper texture. Two noise tiles at different scales + a
+     corner vignette build up an aged-atlas feel: coarse fibres for
+     near grain, fine fibres for paper-surface micro-texture, and a
+     dark-brown vignette at the corners. */
+  #mapWrap::before {
+    /* Corner vignette — aged paper darkens at the edges */
     content: "";
     position: absolute; inset: 0;
     pointer-events: none;
-    opacity: 0.26;
+    background: radial-gradient(ellipse at center, transparent 50%, rgba(74, 46, 22, 0.28) 100%);
+  }
+  #mapWrap::after {
+    /* Stacked turbulence tiles — one coarse, one fine — multiplied
+       over the paper so the sepia reads as fibrous aged parchment. */
+    content: "";
+    position: absolute; inset: 0;
+    pointer-events: none;
+    opacity: 0.45;
     mix-blend-mode: multiply;
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='260' height='260'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='2' stitchTiles='stitch' seed='3'/><feColorMatrix values='0 0 0 0 0.38  0 0 0 0 0.26  0 0 0 0 0.12  0 0 0 0.55 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
-    background-size: 260px 260px;
+    background-image:
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='380' height='380'><filter id='f'><feTurbulence type='fractalNoise' baseFrequency='0.32' numOctaves='2' stitchTiles='stitch' seed='7'/><feColorMatrix values='0 0 0 0 0.30  0 0 0 0 0.20  0 0 0 0 0.08  0 0 0 0.5 0'/></filter><rect width='100%25' height='100%25' filter='url(%23f)'/></svg>"),
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch' seed='3'/><feColorMatrix values='0 0 0 0 0.38  0 0 0 0 0.26  0 0 0 0 0.12  0 0 0 0.55 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+    background-size: 380px 380px, 200px 200px;
   }
   svg#map { width: 100%; height: 100%; display: block; }
 
-  /* Sea-shading halo: soft brown glow around every coastline, fading
-     outward. This is the classic old-atlas trick that makes continents
-     read clearly even when land and sea share a similar paper tone. */
+  /* Multi-layer sea-shading halo: three stacked drop-shadows at
+     progressively wider blur + fainter opacity create concentric
+     "ripple" bands around every coastline, the way hand-drawn old
+     atlases used dozens of parallel shoreline lines to indicate
+     coastal waters. Much cheaper than a per-country filter and
+     gives the ocean genuine dimension near the land. */
   g.countries {
-    filter: drop-shadow(0 0 3.5px rgba(74, 46, 22, 0.55));
+    filter:
+      drop-shadow(0 0 1.5px rgba(74, 46, 22, 0.70))
+      drop-shadow(0 0 5px   rgba(74, 46, 22, 0.32))
+      drop-shadow(0 0 14px  rgba(74, 46, 22, 0.14));
   }
   .country {
     fill: var(--land);
