@@ -324,29 +324,29 @@
     letter-spacing: 0.08em;
   }
 
-  /* HUD — cartouche-style double rule. Outer stroke is a plain CSS
-     border on the card; inner stroke is a plain CSS border on ::after
-     inset 3px. Sharp corners to match the cartouche plaque. No
-     filters, no pseudo-element trickery. Each .hud gets its own pair
-     scoped to itself — NOTE: `.hud` must stay positioned (fixed OR
-     relative) so the absolutely-positioned ::after binds to it, not
-     to a positioned ancestor like .prompt-stack. If the ::after
-     binds to an ancestor, both cards' inner rules coincide and draw
-     one rectangle around the whole stack. */
+  /* HUD — cartouche-style double rule. The border is drawn by an
+     inline <svg class="hud-sketch"> child (injected by
+     setupHudBorders()) containing two stroked <rect> elements
+     filtered with #hudSketch to get the dip-pen wobble. SVG strokes
+     have real ink, no transparent interior, so the displacement
+     filter can't punch holes the way it did on CSS pseudo-borders.
+     The .hud itself has no CSS border — all border ink lives in the
+     SVG overlay. Sized per-card via ResizeObserver in JS. */
   .hud {
     position: fixed;
     background: var(--card-bg);
-    border: 1px solid var(--land-stroke);
-    border-radius: 0;
   }
-  .hud::after {
-    content: "";
+  .hud-sketch {
     position: absolute;
-    inset: 3px;
-    border: 1px solid var(--land-stroke);
-    opacity: 0.4;
+    inset: 0;
+    width: 100%;
+    height: 100%;
     pointer-events: none;
+    overflow: visible;
   }
+  .hud-sketch rect { fill: none; stroke: var(--land-stroke); }
+  .hud-sketch .outer { stroke-width: 1.3; stroke-opacity: 0.72; }
+  .hud-sketch .inner { stroke-width: 1.0; stroke-opacity: 0.38; }
 
   .hud-title {
     top: 18px; left: 18px;
@@ -1546,6 +1546,18 @@
 </style>
 </head>
 <body>
+
+<!-- Dip-pen wobble filter used by the HUD sketch borders. Applied to
+     SVG <rect> strokes (real ink, no transparent interior), so the
+     old pseudo-border failure mode (displacement punching holes
+     through a thin CSS border) can't recur. Scale is kept safely
+     below the smallest stroke-width / 2 used on the rects. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <filter id="hudSketch" x="-5%" y="-5%" width="110%" height="110%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.09" numOctaves="2" seed="23" result="noise"/>
+    <feDisplacementMap in="SourceGraphic" in2="noise" scale="0.5" xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
+</svg>
 
 <div id="mapWrap">
   <svg id="map"></svg>
@@ -5105,6 +5117,63 @@ function wire() {
 }
 
 /* =========================================================================
+   HUD SKETCH BORDERS — inline <svg> per card with two stroked rects,
+   filtered by #hudSketch. Sized to the card via ResizeObserver so
+   responsive layouts keep the rules snapped to the card's edges. SVG
+   stroke is real ink (not a CSS border), so the hudSketch filter
+   can't punch holes through it the way it did on pseudo-borders.
+   ========================================================================= */
+function setupHudBorders() {
+  const SVG_NS = "http://www.w3.org/2000/svg";
+  const cards = document.querySelectorAll(
+    ".hud-title, .hud-score, .hud-toolbar, .hud-prompt, .hud-players"
+  );
+  for (const card of cards) {
+    if (card.querySelector(":scope > .hud-sketch")) continue;
+    const svg = document.createElementNS(SVG_NS, "svg");
+    svg.setAttribute("class", "hud-sketch");
+    svg.setAttribute("aria-hidden", "true");
+    svg.setAttribute("preserveAspectRatio", "none");
+    const g = document.createElementNS(SVG_NS, "g");
+    g.setAttribute("filter", "url(#hudSketch)");
+    const outer = document.createElementNS(SVG_NS, "rect");
+    outer.setAttribute("class", "outer");
+    const inner = document.createElementNS(SVG_NS, "rect");
+    inner.setAttribute("class", "inner");
+    g.appendChild(outer);
+    g.appendChild(inner);
+    svg.appendChild(g);
+    card.prepend(svg);
+
+    const update = () => {
+      const r = card.getBoundingClientRect();
+      const w = r.width, h = r.height;
+      if (w <= 2 || h <= 2) return;
+      svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+      // Outer rect: 0.65px inset so the 1.3px stroke sits entirely
+      // inside the card's box (stroke radius = half of stroke-width).
+      outer.setAttribute("x", 0.65);
+      outer.setAttribute("y", 0.65);
+      outer.setAttribute("width", w - 1.3);
+      outer.setAttribute("height", h - 1.3);
+      // Inner rect: ~3px gap from outer's inside edge. With outer
+      // ending at ~1.3px in, inner starts at 5 → visible gap ≈ 3.7px.
+      const innerInset = 5;
+      inner.setAttribute("x", innerInset);
+      inner.setAttribute("y", innerInset);
+      inner.setAttribute("width", Math.max(0, w - innerInset * 2));
+      inner.setAttribute("height", Math.max(0, h - innerInset * 2));
+    };
+    update();
+    if (window.ResizeObserver) {
+      new ResizeObserver(update).observe(card);
+    } else {
+      window.addEventListener("resize", update);
+    }
+  }
+}
+
+/* =========================================================================
    LOAD
    ========================================================================= */
 async function load() {
@@ -5128,6 +5197,7 @@ async function load() {
   state.features = geo.features.map(f => ({ ...f, id: String(f.id).padStart(3, "0") }));
   $("loader").style.display = "none";
   setupMap();
+  setupHudBorders();
   renderCountries();
   rebuildPool();
   initSpeech();
