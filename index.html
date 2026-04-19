@@ -2513,18 +2513,39 @@ function shuffle(arr) {
   return a;
 }
 
+function isRegionFiltered() {
+  return state.regionFilter && state.regionFilter !== "all";
+}
 function rebuildPool() {
+  const available = new Set(state.features.map(f => String(f.id).padStart(3, "0")));
+  // Region-filtered mode: ignore the tier/level structure entirely.
+  // Build one flat pool from every tier's countries in the chosen
+  // region, ordered by tier (easy → hard) with within-tier shuffle,
+  // and cap at gameLength. This avoids the funky behaviour where tiny
+  // per-level Africa pools caused levels to auto-advance 4-5 times in
+  // a row before reaching the 25-country cap.
+  if (isRegionFiltered()) {
+    const out = [];
+    for (const t of TIERS) {
+      const tierItems = t.ids.filter(id => {
+        const meta = COUNTRIES[id];
+        if (!meta) return false;
+        if (!meta.ocean && !available.has(id)) return false;
+        return meta.region === state.regionFilter;
+      });
+      out.push(...shuffle(tierItems));
+    }
+    const cap = state.gameLength > 0 ? state.gameLength : out.length;
+    state.pool = out.slice(0, cap);
+    return;
+  }
   const tier = TIERS.find(t => t.key === state.level);
   if (!tier) { state.pool = []; return; }
-  const available = new Set(state.features.map(f => String(f.id).padStart(3, "0")));
   const candidates = tier.ids.filter(id => {
     const meta = COUNTRIES[id];
     if (!meta) return false;
     // Oceans are always present (no topojson feature needed); countries must be in the topojson.
     if (!meta.ocean && !available.has(id)) return false;
-    if (state.regionFilter && state.regionFilter !== "all") {
-      return meta.region === state.regionFilter;
-    }
     return true;
   });
   // Shuffle and cap to ROUND_SIZE — keeps each playthrough short and replays fresh.
@@ -2542,7 +2563,13 @@ function pickNext() {
   }
   const remaining = state.pool.filter(id => !state.answered.has(id));
   if (remaining.length === 0) {
-    // Level complete
+    // Region-filtered flat mode: the pool already spans every tier,
+    // so exhaustion = game over. No level-up animation.
+    if (isRegionFiltered()) {
+      showVictory();
+      return;
+    }
+    // All-regions mode: advance to next level (or victory on last).
     if (state.level < TIERS.length) {
       state.level += 1;
       state.answered = new Set();
@@ -3190,6 +3217,14 @@ function speakBritish(text) {
 }
 
 function updateLevelBadge() {
+  // Region-filtered games ignore the tier/level system — show the
+  // region + length in place of "Level I — Home Waters" so the HUD
+  // doesn't lie about what's actually being played.
+  if (isRegionFiltered()) {
+    $("levelNum").textContent = state.regionFilter;
+    $("levelName").textContent = state.gameLength > 0 ? `${state.gameLength} countries` : "all";
+    return;
+  }
   const t = TIERS.find(tt => tt.key === state.level);
   if (!t) return;
   $("levelNum").textContent = "Level " + t.roman;
@@ -3571,15 +3606,20 @@ function wire() {
     cancelTryTimer();
     cancelAutoAdvance();
     state.answered = new Set();
+    state.totalAnswered = 0;
     state.currentId = null;
     state.stage = STAGE.IDLE;
     clearActiveClasses();
     hidePromptFlag();
+    // Region-filtered play ignores tiers; start at level 1 so the
+    // underlying pool builder has a sane state.level to reference.
+    if (isRegionFiltered()) state.level = 1;
     rebuildPool();
+    updateLevelBadge();
     updateStats();
     if (state.pool.length === 0) {
-      showFeedback("hint", `No ${state.regionFilter === "all" ? "countries" : state.regionFilter} in this level. Try a different level or region.`);
-      $("promptQuestion").textContent = "Choose another region or level.";
+      showFeedback("hint", `No countries match that combination. Try a different region or length.`);
+      $("promptQuestion").textContent = "Choose another region or length.";
     } else {
       pickNext();
     }
@@ -3755,6 +3795,7 @@ function wire() {
     state.answered = new Set();
     state.totalAnswered = 0;
     rebuildPool();
+    updateLevelBadge();
     applyPlayerName();
     const firstUp = state.players[0].name;
     const greet = state.mode === "multi"
