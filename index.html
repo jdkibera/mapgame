@@ -301,18 +301,19 @@
     pointer-events: none;
     border-style: solid;
     border-color: var(--land-stroke);
-    filter: url(#hudSketch);
   }
   .hud::before {
     inset: 0;
-    border-width: 1.1px;
+    border-width: 1.3px;
     border-radius: 3px;
+    filter: url(#hudSketch);
   }
   .hud::after {
     inset: 4px;
-    border-width: 0.5px;
+    border-width: 0.6px;
     border-radius: 2px;
-    opacity: 0.45;
+    opacity: 0.5;
+    filter: url(#hudSketchFine);
   }
 
   .hud-title {
@@ -371,16 +372,31 @@
   .hud-score .value { font-size: 1.45rem; font-weight: 500; color: var(--navy); font-variant-numeric: tabular-nums; }
   .hud-score .sep { width: 1px; background: var(--line-soft); align-self: stretch; }
 
-  /* Control strip sits just above the prompt card, horizontally
-     centred so it reads as part of the same stacked unit. The bottom
-     offset tracks the prompt's expected height (prompt is ~210px tall
-     once we've tightened the spacing, plus 34px from the viewport
-     bottom and a 10px gap). */
+  /* Control strip + prompt card stack together in a single flex
+     column, anchored to the viewport bottom. Using a wrapper instead
+     of matching `bottom` offsets guarantees the 10px gap no matter
+     how tall the prompt grows (e.g. when promptSub appears). Both
+     cards share the same 660px max width so their left/right edges
+     align exactly. */
+  .prompt-stack {
+    position: fixed;
+    bottom: 34px; left: 50%; transform: translateX(-50%);
+    width: min(660px, calc(100vw - 36px));
+    display: flex; flex-direction: column; gap: 10px;
+    z-index: 10;
+  }
+  .prompt-stack .hud {
+    position: static;
+    width: auto;
+    left: auto; right: auto; bottom: auto; top: auto; transform: none;
+  }
+  .prompt-stack .hud-prompt {
+    position: relative;  /* card-tools / prompt-flag anchor to this */
+  }
   .hud-toolbar {
-    top: auto; right: auto;
-    bottom: 258px; left: 50%; transform: translateX(-50%);
     padding: 6px 8px;
     display: flex; gap: 6px; align-items: center;
+    justify-content: flex-start;
   }
   .tbtn {
     background: var(--cream);
@@ -520,8 +536,6 @@
 
   /* Prompt card */
   .hud-prompt {
-    bottom: 34px; left: 50%; transform: translateX(-50%);
-    width: min(660px, calc(100vw - 36px));
     padding: 12px 24px 12px 24px;
   }
   .prompt-row {
@@ -1355,13 +1369,13 @@
     .hud-score .value { font-size: 0.85rem; }
     .hud-score .sep { display: none; }
 
-    /* Toolbar: hidden by default so it doesn't block the map.
-       Users can expand via the ⋯ menu button. */
+    /* Toolbar: hidden by default on mobile so it doesn't crowd the
+       map. Users expand via the ⋯ menu button and it appears above
+       the prompt inside the stack. */
     .hud-toolbar {
       display: none;
-      top: auto; bottom: 72px; right: 6px;
       padding: 5px; gap: 4px;
-      flex-wrap: wrap; max-width: calc(100vw - 14px); justify-content: flex-end;
+      flex-wrap: wrap; justify-content: flex-start;
     }
     body.mobile-menu-open .hud-toolbar { display: flex; }
     .tbtn { font-size: 0.72rem; padding: 5px 8px; }
@@ -1381,13 +1395,17 @@
       z-index: 11;
     }
 
-    /* Prompt card — compact, anchored to edges via left/right, not width */
-    .hud-prompt {
-      box-sizing: border-box;
-      left: 6px; right: 6px;
-      bottom: 6px;
+    /* Mobile stack — push to viewport bottom edge with full width. */
+    .prompt-stack {
+      left: 6px; right: 6px; bottom: 6px;
       width: auto;
       transform: none;
+      gap: 4px;
+    }
+
+    /* Prompt card — compact padding + translucent backdrop so the map
+       shows through. Positioning is handled by .prompt-stack. */
+    .hud-prompt {
       padding: 8px 12px 10px 12px;
       background: rgba(247,245,241,0.92);
       backdrop-filter: blur(6px);
@@ -1499,9 +1517,13 @@
      plaque and the coastlines. Applied via CSS `filter: url(#hudSketch)`
      on the ::before / ::after rules of every .hud element. -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-  <filter id="hudSketch" x="-5%" y="-5%" width="110%" height="110%">
-    <feTurbulence type="fractalNoise" baseFrequency="0.07" numOctaves="2" seed="31" result="noise"/>
-    <feDisplacementMap in="SourceGraphic" in2="noise" scale="1.4" xChannelSelector="R" yChannelSelector="G"/>
+  <filter id="hudSketch" x="-6%" y="-6%" width="112%" height="112%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.045" numOctaves="2" seed="31" result="noise"/>
+    <feDisplacementMap in="SourceGraphic" in2="noise" scale="3.0" xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
+  <filter id="hudSketchFine" x="-6%" y="-6%" width="112%" height="112%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.08" numOctaves="2" seed="47" result="noise"/>
+    <feDisplacementMap in="SourceGraphic" in2="noise" scale="2.0" xChannelSelector="R" yChannelSelector="G"/>
   </filter>
 </svg>
 
@@ -1539,6 +1561,16 @@
 
 <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Toggle menu">⋯</button>
 
+<button class="reset-floating" id="resetBtn" title="Reset the entire game" aria-label="Reset game">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+  Reset
+</button>
+
+<footer class="hud hud-footer">© Kibera LLC</footer>
+
+<div class="try-timer" id="tryTimer" aria-live="polite" hidden>10</div>
+
+<div class="prompt-stack">
 <section class="hud hud-toolbar">
   <button class="tbtn" id="studyBtn" title="Study mode — browse all countries & capitals">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
@@ -1584,15 +1616,6 @@
     </select>
   </button>
 </section>
-
-<button class="reset-floating" id="resetBtn" title="Reset the entire game" aria-label="Reset game">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
-  Reset
-</button>
-
-<footer class="hud hud-footer">© Kibera LLC</footer>
-
-<div class="try-timer" id="tryTimer" aria-live="polite" hidden>10</div>
 
 <section class="hud hud-prompt">
   <img id="promptFlag" class="prompt-flag" alt="Flag" style="display:none" />
@@ -1642,6 +1665,7 @@
     </button>
   </div>
 </section>
+</div><!-- /prompt-stack -->
 
 <div class="zoom">
   <button id="zoomIn" title="Zoom in">＋</button>
