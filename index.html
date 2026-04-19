@@ -1231,6 +1231,16 @@
       <option value="12">Level XII — Here Be Dragons</option>
     </select>
   </button>
+  <button class="tbtn" id="lengthBtn" title="Game length — total countries before victory">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h12"/></svg>
+    <select id="lengthSelect" title="Total countries this game">
+      <option value="25">25 countries</option>
+      <option value="50">50 countries</option>
+      <option value="75">75 countries</option>
+      <option value="100">100 countries</option>
+      <option value="0">All (unlimited)</option>
+    </select>
+  </button>
   <button class="tbtn" id="regionBtn" title="Filter by region">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"/></svg>
     <select id="regionSelect" title="Filter by region">
@@ -1739,12 +1749,17 @@ let state = {
   flagMode: false,
   autoAdvanceTimer: null,
   autoZoom: true,
+  // Game-length cap: total countries across all levels before victory.
+  // 0 = unlimited (play every tier to the end).
+  gameLength: 50,
+  totalAnswered: 0,
 };
 // cur() returns the player whose turn it is. Always safe even if mis-indexed.
 function cur() { return state.players[state.currentPlayerIdx] || state.players[0]; }
 try { state.autoZoom = JSON.parse(localStorage.getItem("we_autoZoom") || "true"); } catch(e) {}
 try { state.flagMode = JSON.parse(localStorage.getItem("we_flagMode") || "false"); } catch(e) {}
 try { state.voiceMode = JSON.parse(localStorage.getItem("we_voiceMode") || "true"); } catch(e) {}
+try { state.gameLength = Number(localStorage.getItem("we_gameLength") || 50) || 0; } catch(e) {}
 try { state.players[0].best = Number(localStorage.getItem("we_best") || 0) || 0; } catch(e) { state.players[0].best = 0; }
 
 /* =========================================================================
@@ -2410,6 +2425,12 @@ function rebuildPool() {
 
 function pickNext() {
   cancelAutoAdvance();
+  // Game-length cap: victory early once the user has answered the
+  // chosen number of countries across all levels (0 = unlimited).
+  if (state.gameLength > 0 && state.totalAnswered >= state.gameLength) {
+    showVictory();
+    return;
+  }
   const remaining = state.pool.filter(id => !state.answered.has(id));
   if (remaining.length === 0) {
     // Level complete
@@ -2593,6 +2614,7 @@ function revealCountry(meta) {
   $("answerInput").disabled = true;
   $("submitBtn").disabled = true;
   state.answered.add(state.currentId);
+  state.totalAnswered += 1;
   stopListening();
   playRevealSfx();
   if (!meta.ocean) showPromptFlag(state.currentId); else hidePromptFlag();
@@ -2616,6 +2638,7 @@ function resolveCurrent() {
   $("answerInput").disabled = true;
   $("submitBtn").disabled = true;
   state.answered.add(state.currentId);
+  state.totalAnswered += 1;
   $("promptSub").textContent = "Tap below or press Space for the next country";
   stopListening();
   updateStats();
@@ -2962,6 +2985,7 @@ function showVictory() {
 function resetGame(toLevel) {
   cancelAutoAdvance();
   state.answered = new Set();
+  state.totalAnswered = 0;
   state.countryHistory = new Map();
   state.players.forEach(p => {
     p.score = 0; p.levelScore = 0; p.streak = 0; p.correct = 0;
@@ -3217,6 +3241,15 @@ function wire() {
     });
   }
   $("levelSelect").addEventListener("change", (e) => jumpToLevel(Number(e.target.value)));
+  // Game-length dropdown: persist + take effect next pickNext.
+  const lengthSel = $("lengthSelect");
+  if (lengthSel) {
+    lengthSel.value = String(state.gameLength);
+    lengthSel.addEventListener("change", (e) => {
+      state.gameLength = Number(e.target.value) || 0;
+      try { localStorage.setItem("we_gameLength", String(state.gameLength)); } catch(e) {}
+    });
+  }
   $("regionSelect").addEventListener("change", (e) => {
     state.regionFilter = e.target.value;
     state.answered = new Set();
