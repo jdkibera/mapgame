@@ -488,6 +488,21 @@
     border: 1px solid var(--card-border);
   }
   .tries .dot.used { background: var(--copper); border-color: var(--copper-dark); }
+  .tries .timer {
+    font-variant-numeric: tabular-nums;
+    color: var(--text-med);
+    transition: color 0.2s;
+  }
+  .tries .timer.warn { color: var(--amber); }
+  .tries .timer.urgent {
+    color: var(--bad);
+    font-weight: 600;
+    animation: timerPulse 0.6s ease-in-out infinite;
+  }
+  @keyframes timerPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.55; }
+  }
   .tries .hint-text { font-style: italic; letter-spacing: 0.08em; text-transform: none; font-size: 0.8rem; }
   .tries {
     cursor: pointer;
@@ -1298,6 +1313,8 @@
   </div>
   <div class="feedback" id="feedback"></div>
   <div class="tries" id="triesRow" role="button" tabindex="0" title="Tap to advance">
+    <span class="timer" id="tryTimer">10s</span>
+    <span style="color:var(--line-soft)">·</span>
     <span class="dots" id="triesDots">
       <span class="dot"></span><span class="dot"></span><span class="dot"></span>
     </span>
@@ -2488,6 +2505,7 @@ function pickNext() {
   state.turnJustAdvanced = false;
   state.skipFirstTurnAnnounce = false;
   maybeStartListeningForStage();
+  startTryTimer();
 }
 
 function updateTriesDots() {
@@ -2505,6 +2523,7 @@ function submitAnswer() {
   if (!input.trim()) return;
   const meta = COUNTRIES[state.currentId];
   if (!meta) return;
+  cancelTryTimer();
 
   if (state.stage === STAGE.COUNTRY) {
     if (matchesCountryAny(meta)) {
@@ -2550,6 +2569,7 @@ function submitAnswer() {
       } else {
         showFeedback("wrong", `Not quite. ${3 - state.tries} tr${3 - state.tries === 1 ? "y" : "ies"} left.`);
         playWrongSfx();
+        startTryTimer();
         if (state.voiceMode) restartListeningSoon();
       }
     }
@@ -2574,6 +2594,7 @@ function submitAnswer() {
       } else {
         showFeedback("wrong", `Not the capital. ${3 - state.tries} tr${3 - state.tries === 1 ? "y" : "ies"} left.`);
         playWrongSfx();
+        startTryTimer();
         if (state.voiceMode) restartListeningSoon();
       }
     }
@@ -2592,9 +2613,11 @@ function beginCapitalStage(meta) {
   updateSuggestions();
   setTimeout(() => $("answerInput").focus(), 40);
   if (state.voiceMode) restartListeningSoon();
+  startTryTimer();
 }
 
 function revealCountry(meta) {
+  cancelTryTimer();
   state.stage = STAGE.RESOLVED;
   cur().streak = 0;
   if (meta.ocean) {
@@ -2624,6 +2647,7 @@ function revealCountry(meta) {
 }
 
 function revealCapital(meta) {
+  cancelTryTimer();
   const msg = `The capital is ${meta.capital}.`;
   showFeedback("reveal", msg);
   if (state.voiceMode) speakBritish(msg);
@@ -2634,6 +2658,7 @@ function revealCapital(meta) {
 }
 
 function resolveCurrent() {
+  cancelTryTimer();
   state.stage = STAGE.RESOLVED;
   $("answerInput").disabled = true;
   $("submitBtn").disabled = true;
@@ -2720,6 +2745,51 @@ function advancePlayer() {
   if (state.mode !== "multi" || state.players.length <= 1) return;
   state.currentPlayerIdx = (state.currentPlayerIdx + 1) % state.players.length;
   state.turnJustAdvanced = true;
+}
+
+/* Per-try 10-second countdown. Each try the player has gets its own
+   10s window. If it expires without a submission, the try is consumed
+   (same effect as a wrong answer). Cancelled on submit or reveal. */
+const TRY_SECONDS = 10;
+function startTryTimer() {
+  cancelTryTimer();
+  state.tryTimerEnd = Date.now() + TRY_SECONDS * 1000;
+  renderTryTimer();
+  state.tryTimerInterval = setInterval(renderTryTimer, 250);
+  state.tryTimerTimeout = setTimeout(onTryTimerExpired, TRY_SECONDS * 1000);
+}
+function cancelTryTimer() {
+  if (state.tryTimerInterval) { clearInterval(state.tryTimerInterval); state.tryTimerInterval = null; }
+  if (state.tryTimerTimeout) { clearTimeout(state.tryTimerTimeout); state.tryTimerTimeout = null; }
+  state.tryTimerEnd = 0;
+  const el = $("tryTimer");
+  if (el) { el.textContent = `${TRY_SECONDS}s`; el.className = "timer"; }
+}
+function renderTryTimer() {
+  const el = $("tryTimer");
+  if (!el || !state.tryTimerEnd) return;
+  const remaining = Math.max(0, Math.ceil((state.tryTimerEnd - Date.now()) / 1000));
+  el.textContent = `${remaining}s`;
+  el.className = "timer" + (remaining <= 3 ? " urgent" : remaining <= 5 ? " warn" : "");
+}
+function onTryTimerExpired() {
+  cancelTryTimer();
+  if (state.stage !== STAGE.COUNTRY && state.stage !== STAGE.CAPITAL) return;
+  const meta = COUNTRIES[state.currentId];
+  if (!meta) return;
+  state.tries += 1;
+  updateTriesDots();
+  cur().streak = 0;
+  updateStats();
+  if (state.tries >= 3) {
+    if (state.stage === STAGE.COUNTRY) revealCountry(meta);
+    else revealCapital(meta);
+  } else {
+    showFeedback("wrong", `Time's up. ${3 - state.tries} tr${3 - state.tries === 1 ? "y" : "ies"} left.`);
+    playWrongSfx();
+    startTryTimer();
+    if (state.voiceMode) restartListeningSoon();
+  }
 }
 
 /* Auto-advance after a question resolves (for iPad-friendly play) */
@@ -2984,6 +3054,7 @@ function showVictory() {
    ========================================================================= */
 function resetGame(toLevel) {
   cancelAutoAdvance();
+  cancelTryTimer();
   state.answered = new Set();
   state.totalAnswered = 0;
   state.countryHistory = new Map();
