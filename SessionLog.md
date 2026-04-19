@@ -36,6 +36,27 @@ Start click (linear, no `await` before the speech):
 
 `speakBritish` is the minimal one-liner: `cancel()` → new utterance → `speak()`. No `onend`, no `resume`, no nudges.
 
+## 2026-04-19 — HUD sketched borders: repeated failure (DO NOT retry the same approach)
+
+I spent **six or seven commits** trying to give the HUD cards (control strip + input + title + score) the same hand-drawn wobble as the cartouche plaque, using a CSS pseudo-element with `filter: url(#hudSketch)`. Every attempt visibly broke the bottom edge of the short control strip card (~40px tall). The user had to repeat "just draw the goddamn border" multiple times across many images before I stopped. I made the same underlying mistake at least four times, tuning one knob at a time (filter region, scale, frequency, border width, box-shadow) instead of fixing the root cause or backing out of the approach.
+
+**Root cause (understood, repeatedly):** `feDisplacementMap` resamples the SourceGraphic by ±scale px. A CSS-bordered `::before` has a thin stroke with transparent interior. When displacement points perpendicular to the stroke and magnitude exceeds (border-width / 2), the sample lands in transparent interior → output is transparent → **hole in the border**. On short cards the noise pattern produces long correlated runs along the bottom edge, so holes stack into a missing-side.
+
+**What I kept retrying and why each try failed:**
+- `border: 1.3px + scale 2.2–3.0`: guaranteed holes, scale ≫ border/2.
+- `border: 1.3px + tighter filter region`: filter region only constrains *where output can appear*; it doesn't fix the transparent-interior sampling. Cosmetic change, same holes.
+- Thicker pseudo border + unchanged scale: still holes whenever scale > border/2.
+- Removing the downward-offset `box-shadow`: that was a separate bug (shadow bleeding into the 22px gap between cards). Worth fixing, but didn't fix the bottom-edge holes.
+- Matching the cartouche's `baseFrequency 0.085, scale 1.6` on a thin CSS border: the cartouche works because every SVG shape in `.decorations` is filtered *together*, so nearby shapes overlap and fill in displacement gaps. A lone thin CSS border has nothing to fall back on.
+
+**What I should have done from turn 1:**
+- Recognise that a CSS pseudo-border + displacement filter cannot reliably produce a closed thin-line rectangle; either
+  - ship a plain `border: 1.5px solid` and call it done, or
+  - render the border as an actual SVG `<rect>` (real stroke, continuous path) inside each card and filter *that* element. SVG strokes have no transparent interior to sample from — the cartouche uses this.
+- When a user says the same thing three times in a row, **stop tuning and change architecture**. Every "quick tweak" in this thread cost a full turn and pushed a broken commit live.
+
+**If you ever need to re-add sketched HUD borders:** do it with an inline `<svg>` child per card (or a JS pass that adds one) drawing a stroked `<rect x="1" y="1" width="calc(100%-2)" height="calc(100%-2)" fill="none" stroke="currentColor" stroke-width="1.5" filter="url(#hudSketch)"/>`. Do NOT revive `.hud::before { border; filter }`.
+
 ## Lessons learned (DO NOT redo)
 
 The voice mode / mic permission layer is where I caused the most damage. Things that sounded reasonable but made it worse:
