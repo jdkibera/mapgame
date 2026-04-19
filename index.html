@@ -291,8 +291,8 @@
     background: var(--card-bg);
     border-radius: 3px;
     box-shadow:
-      0 4px 14px rgba(30, 58, 95, 0.14),
-      0 1px 2px rgba(0, 0, 0, 0.06);
+      0 6px 20px rgba(30, 58, 95, 0.10),
+      0 1px 3px rgba(0, 0, 0, 0.04);
   }
   .hud::before,
   .hud::after {
@@ -382,7 +382,7 @@
     position: fixed;
     bottom: 34px; left: 50%; transform: translateX(-50%);
     width: min(660px, calc(100vw - 36px));
-    display: flex; flex-direction: column; gap: 10px;
+    display: flex; flex-direction: column; gap: 18px;
     z-index: 10;
   }
   .prompt-stack .hud {
@@ -394,9 +394,10 @@
     position: relative;  /* card-tools / prompt-flag anchor to this */
   }
   .hud-toolbar {
-    padding: 6px 8px;
+    padding: 8px 14px;
     display: flex; gap: 6px; align-items: center;
     justify-content: flex-start;
+    overflow: hidden;
   }
   .tbtn {
     background: var(--cream);
@@ -4303,18 +4304,39 @@ if ("speechSynthesis" in window) {
 function pickBritishVoice() {
   const voices = getVoices();
   if (!voices.length) return null;
-  // Known-female British voices across macOS / iOS / Windows / Chrome.
-  // Note: "Daniel" (macOS) is British MALE, so he's NOT on this list.
-  const gbFemaleNames = /(Kate|Serena|Martha|Karen|Moira|Fiona|Stephanie|Susan|Amelia|Microsoft Libby|Microsoft Sonia|Microsoft Hazel)/i;
+  // British female voices, in explicit preference order. Serena (macOS,
+  // richer tone) and Martha (macOS newer neural voice) now sit above
+  // Kate so a Mac gets a different accent by default; Microsoft voices
+  // picked up on Windows.
+  const gbPrefs = [
+    /Serena/i,
+    /Martha/i,
+    /Microsoft Sonia/i,
+    /Microsoft Libby/i,
+    /Microsoft Hazel/i,
+    /Kate/i,
+    /Moira/i,
+    /Fiona/i,
+    /Stephanie/i,
+    /Amelia/i,
+  ];
   // Fallback: known-female English voices (non-British) — Samantha on
-  // macOS/iOS, Zira/Jenny on Windows, Google US English voices. Better to
-  // sound female-American than a random default male.
+  // macOS/iOS, Zira/Jenny on Windows, etc. Better female-American than
+  // a random default male.
   const anyFemaleEn = /(Samantha|Zira|Jenny|Aria|Nora|Ava|Allison|Susan|Tessa|Veena|Karen)/i;
-  const gbFemale = voices.find(v => /en.?GB/i.test(v.lang) && gbFemaleNames.test(v.name));
-  const femaleEn = voices.find(v => /^en/i.test(v.lang) && (gbFemaleNames.test(v.name) || anyFemaleEn.test(v.name)));
+  for (const pref of gbPrefs) {
+    const v = voices.find(vv => /en.?GB/i.test(vv.lang) && pref.test(vv.name));
+    if (v) return v;
+  }
+  // No GB-tagged match — try the same preferences against any en-* voice.
+  for (const pref of gbPrefs) {
+    const v = voices.find(vv => /^en/i.test(vv.lang) && pref.test(vv.name));
+    if (v) return v;
+  }
+  const femaleEn = voices.find(v => /^en/i.test(v.lang) && anyFemaleEn.test(v.name));
   const anyGB = voices.find(v => /en.?GB/i.test(v.lang));
   const anyEn = voices.find(v => /^en/i.test(v.lang));
-  return gbFemale || femaleEn || anyGB || anyEn || voices[0] || null;
+  return femaleEn || anyGB || anyEn || voices[0] || null;
 }
 
 function speakBritish(text) {
