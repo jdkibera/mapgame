@@ -354,7 +354,7 @@
   .hud-sketch .inner { stroke-width: 1.0; stroke-opacity: 0.42; }
 
   .hud-title {
-    top: 32px; left: 32px;
+    top: var(--card-top, 32px); left: 32px;
     padding: 14px 20px 12px 20px;
     max-width: 320px;
   }
@@ -394,7 +394,7 @@
   }
 
   .hud-score {
-    top: 32px; right: 32px;
+    top: var(--card-top, 32px); right: 32px;
     padding: 10px 16px;
     display: flex; gap: 18px; align-items: baseline;
     font-family: var(--font-heading);
@@ -448,7 +448,12 @@
     transition: all 0.15s;
   }
   .tbtn:hover { border-color: var(--copper-light); color: var(--copper); }
-  .tbtn svg { width: 14px; height: 14px; }
+  /* Icons render in the map's ink colour, not navy — gives the
+     toolbar the same old-world feel as the coastlines and cartouche.
+     Text on the buttons stays navy for legibility. */
+  .tbtn svg { width: 14px; height: 14px; color: var(--land-stroke); opacity: 0.85; }
+  .tbtn:hover svg { color: var(--copper); opacity: 1; }
+  .tbtn.toggled svg { color: var(--cream); opacity: 1; }
   .tbtn.danger:hover { color: var(--bad); border-color: var(--bad-soft); }
   .tbtn.muted { color: var(--text-light); }
   .tbtn.muted .sound-on { display: none; }
@@ -557,7 +562,8 @@
     font-style: italic;
     font-size: 0.72rem;
     letter-spacing: 0.18em;
-    color: var(--text-light);
+    color: var(--land-stroke);
+    opacity: 0.7;
     background: transparent;
     border: none;
     box-shadow: none;
@@ -813,6 +819,15 @@
   .card-tool svg { width: 22px; height: 22px; }
   .card-tool:hover { color: var(--copper); background: var(--copper-pale); }
   .card-tool.toggled { color: var(--copper); }
+  .card-tool-text {
+    padding: 6px 10px;
+    font-family: var(--font-body);
+    font-size: 0.78rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-light);
+  }
+  .card-tool-text:hover { color: var(--bad); background: transparent; }
   .card-tool.muted { color: var(--text-light); }
   .card-tool.muted .sound-on { display: none; }
   .card-tool.muted .sound-off { display: inline-block !important; }
@@ -833,29 +848,11 @@
     box-shadow: 0 2px 10px rgba(0,0,0,0.08);
   }
 
-  /* Floating reset — sits just above the zoom cluster in the bottom
-     right. Same parchment-label vibe as the HUD cards. */
-  .reset-floating {
-    position: fixed;
-    bottom: 210px; right: 22px;
-    background: var(--card-bg);
-    border: 1px solid var(--land-stroke);
-    border-radius: 3px;
-    color: var(--navy);
-    font-family: var(--font-body);
-    font-size: 0.82rem;
-    padding: 7px 12px;
-    cursor: pointer;
-    display: inline-flex; align-items: center; gap: 6px;
-    box-shadow: 0 4px 14px rgba(30, 58, 95, 0.14), 0 1px 2px rgba(0,0,0,0.06);
-    transition: color 0.15s, border-color 0.15s;
-  }
-  .reset-floating svg { width: 14px; height: 14px; }
-  .reset-floating:hover { color: var(--bad); border-color: var(--bad); }
-
-  /* Zoom controls */
+  /* Zoom controls — the lowest button (magnifier / auto-zoom toggle)
+     has its middle aligned with the map's bottom-right corner via
+     --zoom-bottom (set in setupMap). */
   .zoom {
-    position: fixed; bottom: 22px; right: 22px;
+    position: fixed; bottom: var(--zoom-bottom, 22px); right: 22px;
     display: flex; flex-direction: column; gap: 4px;
   }
   .zoom button {
@@ -1600,11 +1597,6 @@
 
 <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Toggle menu">⋯</button>
 
-<button class="reset-floating" id="resetBtn" title="Reset the entire game" aria-label="Reset game">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
-  Reset
-</button>
-
 <footer class="hud hud-footer">© Kibera LLC</footer>
 
 <div class="try-timer" id="tryTimer" aria-live="polite" hidden>10</div>
@@ -1694,8 +1686,9 @@
   </div>
   <div class="feedback" id="feedback"></div>
   <div class="card-tools">
+    <button class="card-tool card-tool-text" id="resetBtn" title="Reset the entire game" aria-label="Reset game">Reset</button>
     <button class="card-tool" id="paletteBtn" title="Switch ocean palette — admiralty blue → jade → parchment" aria-label="Toggle map palette">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 13h18"/><path d="M12 4a13 13 0 0 1 0 17"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 1 18c.9 0 1.4-.7 1.4-1.5 0-.4-.2-.8-.2-1.2 0-.9.7-1.5 1.6-1.5h2A3.8 3.8 0 0 0 21 13.1 9 9 0 0 0 12 3z"/><circle cx="7.5" cy="10.5" r="1"/><circle cx="11" cy="7" r="1"/><circle cx="15.5" cy="7.5" r="1"/><circle cx="17" cy="12" r="1"/></svg>
     </button>
     <button class="card-tool" id="flagBtn" title="Flag mode — show the country's flag while you guess" aria-label="Flag mode">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
@@ -2437,6 +2430,22 @@ function setupMap() {
   const mapX0 = w / 2 - mapW / 2;
   const mapY0 = h / 2 - mapH / 2;
   window._mapBounds = { x0: mapX0, y0: mapY0, w: mapW, h: mapH };
+  // Publish map geometry as CSS variables so the HTML HUD layer can
+  // snap to the map frame without hard-coding pixel offsets:
+  //   --card-top    = viewport y where the title/score/cartouche
+  //                   plaques should start (cartouche half-height
+  //                   above the top frame rule).
+  //   --zoom-bottom = viewport "bottom:" offset for the zoom stack so
+  //                   the magnifier (lowest button) has its middle on
+  //                   the map's bottom-right corner.
+  const cartoucheHalfH = 36; // matches plaque height/2 in drawTitleCartouche
+  const zoomBtnHalf = 19;    // half of the 38px zoom-button height
+  document.documentElement.style.setProperty(
+    "--card-top", `${Math.max(8, mapY0 - cartoucheHalfH)}px`
+  );
+  document.documentElement.style.setProperty(
+    "--zoom-bottom", `${Math.max(8, mapY0 - zoomBtnHalf)}px`
+  );
 
   // Cheap land/ocean lookup used to keep decorations and shipping
   // routes off of continents. Iterating every country feature per
@@ -3033,8 +3042,16 @@ function waypointRoute(waypoints) {
 function routeCrossesLand(coords, skipEnds = 1) {
   const fn = window._isOcean;
   if (!fn) return false;
+  // Count land samples rather than trip on the first one. A route
+  // whose great circle skims a promontory (southern Newfoundland,
+  // Iberia, Corsica) will register one or two land samples even
+  // though it isn't really "crossing" a continent. A genuine
+  // continental crossing produces many more. Threshold tuned to let
+  // trans-Atlantic service through while still catching the big
+  // overland offenders (SYD-DAR, LIS-SUE, PAN-VAL).
+  let land = 0;
   for (let i = skipEnds; i < coords.length - skipEnds; i++) {
-    if (!fn(coords[i])) return true;
+    if (!fn(coords[i])) { land++; if (land > 4) return true; }
   }
   return false;
 }
