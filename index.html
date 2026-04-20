@@ -1045,8 +1045,8 @@
 
   /* Multiplayer score strip (replaces the 4-stat card in multi mode) */
   .hud-players {
-    top: 18px; right: 18px;
-    padding: 8px 12px;
+    top: var(--card-top, 32px); right: 32px;
+    padding: 10px 16px;
     display: flex; gap: 10px; align-items: center;
     font-family: var(--font-heading);
     max-width: 60vw; flex-wrap: wrap;
@@ -1593,7 +1593,9 @@
   <div class="stat"><span class="label">Best</span><span class="value" id="best">0</span></div>
 </section>
 
-<section class="hud hud-players" id="hudPlayers" aria-label="Players" hidden></section>
+<section class="hud hud-players" id="hudPlayers" aria-label="Players" hidden>
+  <svg class="hud-sketch" viewBox="0 0 400 60" preserveAspectRatio="none" aria-hidden="true"><g filter="url(#hudSketch)"><rect class="outer" x="1" y="1" width="398" height="58"/><rect class="inner" x="5" y="5" width="390" height="50"/></g></svg>
+</section>
 
 <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Toggle menu">⋯</button>
 
@@ -3679,9 +3681,9 @@ function drawAtlasDecorations(parent) {
     cart.append("rect").attr("class", "map-frame-inner")
       .attr("x", -187.5).attr("y", -28.5).attr("width", 375).attr("height", 57);
     cart.append("text").attr("class", "deco-cartouche-text")
-      .attr("font-size", 22.5).attr("y", -4.5).text("MAP OF · THE WORLD");
+      .attr("font-size", 28).attr("y", -5).text("MAP OF · THE WORLD");
     cart.append("text").attr("class", "deco-cartouche-text")
-      .attr("font-size", 10.5).attr("y", 19.5).attr("opacity", 0.62)
+      .attr("font-size", 14).attr("y", 22).attr("opacity", 0.62)
       .text("DRAWN FOR YOUNG VOYAGERS");
     // Flourish finials off each end of the plaque (scaled 1.5x)
     cart.append("path").attr("class", "deco-ink").attr("stroke-width", 0.5).attr("stroke-opacity", 0.65)
@@ -4096,7 +4098,9 @@ function updateStats() {
     $("best").textContent = p.best;
   } else {
     const hud = $("hudPlayers");
-    hud.innerHTML = "";
+    // Preserve the .hud-sketch border SVG; just clear the player cells
+    // so innerHTML="" doesn't wipe the card's hand-drawn rules.
+    hud.querySelectorAll(".pstat").forEach(el => el.remove());
     state.players.forEach((pl, i) => {
       const h = hueFor(i);
       const cell = document.createElement("div");
