@@ -5241,6 +5241,16 @@ function wire() {
       advance();
       return;
     }
+    if (state.stage === STAGE.COUNTRY && activeIsInput && $("answerInput").value.trim() === "") {
+      e.preventDefault();
+      onAdvanceTap();
+      return;
+    }
+    if (state.stage === STAGE.COUNTRY && !activeIsInput) {
+      e.preventDefault();
+      onAdvanceTap();
+      return;
+    }
     if (state.stage === STAGE.CAPITAL && activeIsInput && $("answerInput").value.trim() === "") {
       e.preventDefault();
       advance();
